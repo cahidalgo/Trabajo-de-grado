@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../data/repositories/usuario_repository.dart';
 import '../data/models/usuario.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 enum AuthState { idle, loading, registroExitoso, loginExitoso, error }
 
@@ -12,48 +12,38 @@ class AuthViewModel extends ChangeNotifier {
   String?   _errorMsg;
   int?      _usuarioIdActual;
 
-  AuthState get state        => _state;
-  String?   get errorMsg     => _errorMsg;
-  int?      get usuarioId    => _usuarioIdActual;
+  AuthState get state     => _state;
+  String?   get errorMsg  => _errorMsg;
+  int?      get usuarioId => _usuarioIdActual;
 
   Future<void> registrar({
+    required String nombreCompleto,
     required String correoOTelefono,
     required String contrasena,
-    required bool aceptoPolitica,
+    required bool   aceptoPolitica,
   }) async {
-    if (!aceptoPolitica) {
-      _errorMsg = 'Debes aceptar la política de privacidad para continuar.';
-      _state = AuthState.error;
-      notifyListeners();
-      return;
-    }
-
     _state = AuthState.loading;
     notifyListeners();
-
     try {
-      final existe = await _repo.existeCorreoOTelefono(correoOTelefono.trim());
+      final existe = await _repo.existeCorreoOTelefono(correoOTelefono);
       if (existe) {
         _errorMsg = 'Este correo o celular ya está registrado.';
         _state = AuthState.error;
         notifyListeners();
         return;
       }
-
       final hash = _repo.hashContrasena(contrasena);
       final usuario = Usuario(
-        correoOTelefono: correoOTelefono.trim(),
+        nombreCompleto: nombreCompleto,
+        correoOTelefono: correoOTelefono,
         contrasenaHash: hash,
         aceptoPolitica: true,
         fechaRegistro: DateTime.now().toIso8601String(),
       );
-
       final id = await _repo.insertar(usuario);
       await _repo.registrarConsentimiento(id);
-
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('usuarioId', id);
-
       _usuarioIdActual = id;
       _state = AuthState.registroExitoso;
     } catch (e) {
@@ -69,18 +59,15 @@ class AuthViewModel extends ChangeNotifier {
   }) async {
     _state = AuthState.loading;
     notifyListeners();
-
     try {
-      final hash = _repo.hashContrasena(contrasena);
+      final hash    = _repo.hashContrasena(contrasena);
       final usuario = await _repo.buscarPorCredenciales(correoOTelefono.trim(), hash);
-
       if (usuario != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setInt('usuarioId', usuario.id!);
         _usuarioIdActual = usuario.id;
         _state = AuthState.loginExitoso;
       } else {
-        // Mensaje genérico: no revela si el error es correo o contraseña (RNF05)
         _errorMsg = 'Correo/celular o contraseña incorrectos. Intenta de nuevo.';
         _state = AuthState.error;
       }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'viewmodels/auth_viewmodel.dart';
+import 'viewmodels/perfil_viewmodel.dart';
 
 void main() {
   runApp(const VendedoresTMApp());
@@ -16,6 +17,7 @@ class VendedoresTMApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthViewModel()),
+        ChangeNotifierProvider(create: (_) => PerfilViewModel()),
       ],
       child: MaterialApp.router(
         title: 'Vendedores TM',

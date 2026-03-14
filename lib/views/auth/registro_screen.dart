@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/utils/validators.dart';
+import '../../core/widgets/password_strength_indicator.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 
 class RegistroScreen extends StatefulWidget {
@@ -13,30 +14,43 @@ class RegistroScreen extends StatefulWidget {
 }
 
 class _RegistroScreenState extends State<RegistroScreen> {
-  final _formKey    = GlobalKey<FormState>();
-  final _correoCtrl = TextEditingController();
-  final _passCtrl   = TextEditingController();
+  final _formKey       = GlobalKey<FormState>();
+  final _nombreCtrl    = TextEditingController();
+  final _correoCtrl    = TextEditingController();
+  final _passCtrl      = TextEditingController();
+  final _confirmCtrl   = TextEditingController();
   bool _aceptoPolitica = false;
   bool _verPass        = false;
+  bool _verConfirm     = false;
+  String _passActual   = '';
 
   @override
   void dispose() {
+    _nombreCtrl.dispose();
     _correoCtrl.dispose();
     _passCtrl.dispose();
+    _confirmCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _onRegistrar() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_aceptoPolitica) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Debes aceptar la política de privacidad.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
     final vm = context.read<AuthViewModel>();
     await vm.registrar(
-      correoOTelefono: _correoCtrl.text,
+      nombreCompleto: _nombreCtrl.text.trim(),
+      correoOTelefono: _correoCtrl.text.trim(),
       contrasena: _passCtrl.text,
       aceptoPolitica: _aceptoPolitica,
     );
     if (!mounted) return;
     if (vm.state == AuthState.registroExitoso) {
-      context.go('/onboarding');
+      context.go('/completar-perfil');
     }
   }
 
@@ -54,10 +68,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
         ],
       ),
     );
@@ -76,42 +87,75 @@ class _RegistroScreenState extends State<RegistroScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
                 const Text('¡Bienvenido/a!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                const Text('Crea tu cuenta para encontrar trabajo.', style: TextStyle(fontSize: 14)),
-                const SizedBox(height: 32),
+                const Text('Crea tu cuenta para encontrar trabajo.', style: TextStyle(fontSize: 14, color: Color(0xFF757575))),
+                const SizedBox(height: 28),
 
-                // Campo correo/celular
+                // ── Nombre completo ──────────────────────────
+                TextFormField(
+                  controller: _nombreCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre completo',
+                    prefixIcon: Icon(Icons.badge_outlined),
+                    hintText: 'Ej: Juan Carlos Pérez',
+                  ),
+                  validator: Validators.nombreCompleto,
+                ),
+                const SizedBox(height: 16),
+
+                // ── Correo o celular ──────────────────────────
                 TextFormField(
                   controller: _correoCtrl,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
                     labelText: AppStrings.correoLabel,
                     prefixIcon: Icon(Icons.person_outline),
+                    hintText: 'Ej: correo@gmail.com o 3001234567',
                   ),
                   validator: Validators.correoOTelefono,
                 ),
                 const SizedBox(height: 16),
 
-                // Campo contraseña
+                // ── Contraseña ────────────────────────────────
                 TextFormField(
                   controller: _passCtrl,
                   obscureText: !_verPass,
+                  onChanged: (v) => setState(() => _passActual = v),
                   decoration: InputDecoration(
                     labelText: AppStrings.passLabel,
                     prefixIcon: const Icon(Icons.lock_outline),
+                    hintText: 'Mín. 8 caracteres, 1 mayúscula, 1 número',
                     suffixIcon: IconButton(
                       icon: Icon(_verPass ? Icons.visibility_off : Icons.visibility),
                       onPressed: () => setState(() => _verPass = !_verPass),
-                      tooltip: _verPass ? 'Ocultar contraseña' : 'Ver contraseña',
+                      tooltip: _verPass ? 'Ocultar' : 'Ver contraseña',
                     ),
                   ),
                   validator: Validators.contrasena,
                 ),
+                PasswordStrengthIndicator(password: _passActual),
+                const SizedBox(height: 16),
+
+                // ── Confirmar contraseña ──────────────────────
+                TextFormField(
+                  controller: _confirmCtrl,
+                  obscureText: !_verConfirm,
+                  decoration: InputDecoration(
+                    labelText: 'Confirmar contraseña',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(_verConfirm ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setState(() => _verConfirm = !_verConfirm),
+                    ),
+                  ),
+                  validator: Validators.confirmarContrasena(_passCtrl.text),
+                ),
                 const SizedBox(height: 24),
 
-                // Checkbox política de privacidad (RF12 — OBLIGATORIO)
+                // ── Política de privacidad ────────────────────
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -146,23 +190,31 @@ class _RegistroScreenState extends State<RegistroScreen> {
                   ],
                 ),
 
-                // Mensaje error
+                // ── Error del ViewModel ───────────────────────
                 if (vm.state == AuthState.error)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      vm.errorMsg ?? '',
-                      style: const TextStyle(color: Color(0xFFB00020), fontSize: 13),
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEBEE),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: Color(0xFFB00020), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(vm.errorMsg ?? '', style: const TextStyle(color: Color(0xFFB00020), fontSize: 13))),
+                      ],
                     ),
                   ),
                 const SizedBox(height: 24),
 
-                // Botón crear cuenta (deshabilitado si no acepta política)
+                // ── Botón crear cuenta ────────────────────────
                 ElevatedButton(
                   onPressed: (_aceptoPolitica && vm.state != AuthState.loading) ? _onRegistrar : null,
                   child: vm.state == AuthState.loading
                       ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text(AppStrings.registro),
+                      : const Text('Crear cuenta'),
                 ),
                 const SizedBox(height: 16),
 
