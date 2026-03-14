@@ -1,21 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'core/router/app_router.dart';
+import 'core/theme/app_theme.dart';
+import 'viewmodels/auth_viewmodel.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const VendedoresTMApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class VendedoresTMApp extends StatelessWidget {
+  const VendedoresTMApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Vendedores TM',
-      debugShowCheckedModeBanner: false,
-      home: const Scaffold(
-        body: Center(
-          child: Text('¡Proyecto listo!'),
-        ),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthViewModel()),
+      ],
+      child: MaterialApp.router(
+        title: 'Vendedores TM',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.theme,
+        routerConfig: appRouter,
       ),
     );
   }

@@ -9,11 +9,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mvp/main.dart';
+// Make sure that 'MyApp' is defined and exported in main.dart, or replace 'MyApp' below with the correct class name.
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+    // Replace 'MyApp' with the actual widget class exported from main.dart if different.
+    await tester.pumpWidget(const VendedoresTMApp());
 
     // Verify that our counter starts at 0.
     expect(find.text('0'), findsOneWidget);

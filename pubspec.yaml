@@ -36,7 +36,7 @@ dependencies:
   crypto: ^3.0.3           # SHA-256 para contraseñas (RNF05)
   shared_preferences: ^2.2.2 # sesión local y flag de onboarding
   flutter_svg: ^2.0.9      # íconos accesibles
-  go_router: ^13.0.0       # navegación declarativa
+  go_router: ^17.1.0       # navegación declarativa
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
