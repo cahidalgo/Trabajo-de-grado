@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_strings.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -19,15 +18,12 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _redirigir() async {
-    await Future.delayed(const Duration(milliseconds: 1200));
+    await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
-
-    final prefs = await SharedPreferences.getInstance();
+    final prefs           = await SharedPreferences.getInstance();
     final usuarioId       = prefs.getInt('usuarioId');
     final onboardingHecho = prefs.getBool('onboarding_completado') ?? false;
-
     if (!mounted) return;
-
     if (usuarioId != null) {
       context.go('/home');
     } else if (!onboardingHecho) {
@@ -41,20 +37,51 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primary,
-      body: const Center(
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.work_outline, size: 80, color: AppColors.onPrimary),
-            SizedBox(height: 16),
-            Text(
-              AppStrings.appName,
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.onPrimary),
+            // ── Logo de la app ──────────────────────────────
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Image.asset(
+                'assets/icon/icon.png',
+                fit: BoxFit.contain,
+              ),
             ),
-            SizedBox(height: 8),
-            Text('Tu puerta al trabajo formal', style: TextStyle(color: AppColors.onPrimary, fontSize: 14)),
-            SizedBox(height: 40),
-            CircularProgressIndicator(color: AppColors.onPrimary),
+            const SizedBox(height: 24),
+            const Text(
+              'Vendedores TM',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Tu puerta al trabajo formal',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 48),
+            const CircularProgressIndicator(
+              color: Colors.white,
+              strokeWidth: 2,
+            ),
           ],
         ),
       ),

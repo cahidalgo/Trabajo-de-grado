@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../core/constants/app_strings.dart';
-import '../../viewmodels/auth_viewmodel.dart';
 import '../vacantes/vacantes_list_screen.dart';
 import '../postulaciones/historial_screen.dart';
 import '../perfil/perfil_screen.dart';
