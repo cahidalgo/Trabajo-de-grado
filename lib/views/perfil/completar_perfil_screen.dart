@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/validators.dart';
 import '../../data/models/perfil.dart';
 import '../../viewmodels/perfil_viewmodel.dart';
+import '../../core/widgets/voice_input_field.dart';
 
 class CompletarPerfilScreen extends StatefulWidget {
   const CompletarPerfilScreen({super.key});
@@ -279,11 +280,11 @@ class _Paso1Educacion extends StatelessWidget {
   }
 }
 
-// ── Paso 2: Experiencia ───────────────────────────────────────────────────
+// ── Paso 2: Experiencia — CON VOZ en ambos campos ─────────────────────────
 class _Paso2Experiencia extends StatelessWidget {
-  final GlobalKey<FormState> formKey;
-  final TextEditingController experienciaCtrl;
-  final TextEditingController habilidadesCtrl;
+  final GlobalKey<FormState>   formKey;
+  final TextEditingController  experienciaCtrl;
+  final TextEditingController  habilidadesCtrl;
 
   const _Paso2Experiencia({
     super.key,
@@ -301,32 +302,34 @@ class _Paso2Experiencia extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Cuéntanos tu experiencia',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Cuéntanos tu experiencia',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 6),
-            const Text('Describe qué trabajos has tenido y qué sabes hacer.',
-                style: TextStyle(color: AppColors.textSecondary)),
-            const SizedBox(height: 20),
-            TextFormField(
-              controller: experienciaCtrl,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Experiencia laboral',
-                hintText: 'Ej: Vendedor ambulante por 5 años, trabajo en restaurante...',
-                alignLabelWithHint: true,
-              ),
-              validator: Validators.textoLargo,
+            const Text(
+              'Puedes escribir o tocar el micrófono 🎙️ y dictarlo.',
+              style: TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 20),
-            TextFormField(
-              controller: habilidadesCtrl,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Tus habilidades',
-                hintText: 'Ej: Atención al cliente, manejo de dinero, trabajo en equipo...',
-                alignLabelWithHint: true,
-              ),
+
+            // ── Experiencia laboral — CON VOZ ──────────────────────────
+            VoiceInputField(
+              controller: experienciaCtrl,
+              labelText: 'Experiencia laboral',
+              hintText: 'Ej: Vendedor ambulante por 5 años...',
               validator: Validators.textoLargo,
+              maxLines: 4,
+            ),
+            const SizedBox(height: 20),
+
+            // ── Habilidades — CON VOZ ──────────────────────────────────
+            VoiceInputField(
+              controller: habilidadesCtrl,
+              labelText: 'Tus habilidades',
+              hintText: 'Ej: Atención al cliente, manejo de dinero...',
+              validator: Validators.textoLargo,
+              maxLines: 3,
             ),
           ],
         ),
@@ -334,6 +337,7 @@ class _Paso2Experiencia extends StatelessWidget {
     );
   }
 }
+
 
 // ── Paso 3: Preferencias ──────────────────────────────────────────────────
 class _Paso3Preferencias extends StatelessWidget {
