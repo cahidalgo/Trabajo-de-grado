@@ -1,46 +1,600 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/avatar_perfil.dart';
+import '../../data/models/usuario.dart';
+import '../../data/models/perfil.dart';
+import '../../data/repositories/usuario_repository.dart';
+import '../../data/repositories/perfil_repository.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 
-class PerfilScreen extends StatelessWidget {
+class PerfilScreen extends StatefulWidget {
   const PerfilScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Mi perfil')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          const CircleAvatar(radius: 40, child: Icon(Icons.person, size: 48)),
-          const SizedBox(height: 16),
-          const Center(child: Text('Mi cuenta', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-          const SizedBox(height: 32),
-          ListTile(
-            leading: const Icon(Icons.edit_outlined, color: AppColors.primary),
-            title: const Text('Editar perfil laboral'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () { /* próximo sprint */ },
+  State<PerfilScreen> createState() => _PerfilScreenState();
+}
+
+class _PerfilScreenState extends State<PerfilScreen>
+    with AutomaticKeepAliveClientMixin {
+  final _usuarioRepo = UsuarioRepository();
+  final _perfilRepo  = PerfilRepository();
+
+  Usuario? _usuario;
+  Perfil?  _perfil;
+  bool     _cargando = true;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  Future<void> _cargar() async {
+    setState(() => _cargando = true);
+    final prefs     = await SharedPreferences.getInstance();
+    final usuarioId = prefs.getInt('usuarioId');
+    if (usuarioId != null) {
+      _usuario = await _usuarioRepo.obtenerPorId(usuarioId);
+      _perfil  = await _perfilRepo.obtenerPorUsuario(usuarioId);
+    }
+    if (mounted) setState(() => _cargando = false);
+  }
+
+  int _calcularCompletitud() {
+    if (_perfil == null) return 0;
+    final campos = [
+      _perfil!.nivelEducativo,
+      _perfil!.experienciaLaboral,
+      _perfil!.habilidades,
+      _perfil!.areasInteres,
+      _perfil!.modalidadPreferida,
+      _perfil!.jornadaPreferida,
+    ];
+    final llenos = campos.where((c) => c != null && c.isNotEmpty).length;
+    return ((llenos / campos.length) * 100).round();
+  }
+
+  String _iniciales() {
+    final nombre = _usuario?.nombreCompleto ?? '';
+    if (nombre.isEmpty) return '?';
+    final partes = nombre.trim().split(' ');
+    if (partes.length >= 2) {
+      return '${partes[0][0]}${partes[1][0]}'.toUpperCase();
+    }
+    return nombre[0].toUpperCase();
+  }
+
+  String _formatFecha(String? iso) {
+    if (iso == null) return '—';
+    try {
+      final dt = DateTime.parse(iso);
+      return '${dt.day}/${dt.month}/${dt.year}';
+    } catch (_) {
+      return '—';
+    }
+  }
+
+  void _confirmarCerrarSesion() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Cerrar sesión'),
+        content: const Text('¿Estás seguro que deseas cerrar sesión?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
           ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined, color: AppColors.primary),
-            title: const Text('Política de privacidad'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () { /* mostrar política */ },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout, color: AppColors.error),
-            title: const Text('Cerrar sesión', style: TextStyle(color: AppColors.error)),
-            onTap: () async {
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
               await context.read<AuthViewModel>().cerrarSesion();
-              if (context.mounted) context.go('/login');
+              if (mounted) context.go('/login');
             },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Cerrar sesión'),
           ),
         ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
+    if (_cargando) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final completitud = _calcularCompletitud();
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: RefreshIndicator(
+        onRefresh: _cargar,
+        child: CustomScrollView(
+          slivers: [
+            // ── AppBar expandible ────────────────────────────────────
+            SliverAppBar(
+              expandedHeight: 220,
+              pinned: true,
+              backgroundColor: AppColors.primary,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0xFF1976D2), Color(0xFF1565C0)],
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 20),
+
+                        // ── Avatar con foto editable ─────────────────
+                        AvatarPerfil(
+                          iniciales: _iniciales(),
+                          radius: 44,
+                          editable: true,
+                          onFotoCambiada: (_) => setState(() {}),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // ── Nombre ───────────────────────────────────
+                        Text(
+                          _usuario?.nombreCompleto ?? 'Sin nombre',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+
+                        // ── Correo / celular ─────────────────────────
+                        Text(
+                          _usuario?.correoOTelefono ?? '',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.white70,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // ── Chip de completitud ──────────────────────
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            completitud == 100
+                                ? '✅ Perfil completo'
+                                : '⚠️ Perfil $completitud% completo',
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Botón editar en la barra cuando está colapsada
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                  tooltip: 'Editar perfil',
+                  onPressed: () async {
+                    await context.push('/editar-perfil');
+                    _cargar();
+                  },
+                ),
+              ],
+            ),
+
+            // ── Contenido ────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Barra de completitud ─────────────────────────
+                    _TarjetaCompletitud(
+                      completitud: completitud,
+                      onCompletar: () async {
+                        await context.push('/editar-perfil');
+                        _cargar();
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Información laboral ──────────────────────────
+                    const _SeccionTitulo(
+                      titulo: 'Información laboral',
+                      icono: Icons.work_outline,
+                    ),
+                    _TarjetaInfo(
+                      campos: [
+                        _CampoInfo(
+                          'Nivel educativo',
+                          _perfil?.nivelEducativo,
+                          Icons.school_outlined,
+                        ),
+                        _CampoInfo(
+                          'Experiencia laboral',
+                          _perfil?.experienciaLaboral,
+                          Icons.history_edu_outlined,
+                        ),
+                        _CampoInfo(
+                          'Habilidades',
+                          _perfil?.habilidades,
+                          Icons.star_outline,
+                        ),
+                        _CampoInfo(
+                          'Áreas de interés',
+                          _perfil?.areasInteres,
+                          Icons.category_outlined,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Preferencias ─────────────────────────────────
+                    const _SeccionTitulo(
+                      titulo: 'Preferencias de trabajo',
+                      icono: Icons.tune_outlined,
+                    ),
+                    _TarjetaInfo(
+                      campos: [
+                        _CampoInfo(
+                          'Modalidad preferida',
+                          _perfil?.modalidadPreferida,
+                          Icons.laptop_outlined,
+                        ),
+                        _CampoInfo(
+                          'Jornada preferida',
+                          _perfil?.jornadaPreferida,
+                          Icons.schedule_outlined,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Botón editar perfil ──────────────────────────
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        await context.push('/editar-perfil');
+                        _cargar();
+                      },
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Editar información'),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Cuenta ───────────────────────────────────────
+                    const _SeccionTitulo(
+                      titulo: 'Cuenta',
+                      icono: Icons.settings_outlined,
+                    ),
+                    _TarjetaOpciones(
+                      opciones: [
+                        _OpcionMenu(
+                          icono: Icons.privacy_tip_outlined,
+                          label: 'Política de privacidad',
+                          color: AppColors.primary,
+                          onTap: () => context.push('/politica-privacidad'),
+                        ),
+                        _OpcionMenu(
+                          icono: Icons.calendar_today_outlined,
+                          label:
+                              'Miembro desde: ${_formatFecha(_usuario?.fechaRegistro)}',
+                          color: AppColors.textSecondary,
+                          onTap: null,
+                        ),
+                        _OpcionMenu(
+                          icono: Icons.logout,
+                          label: 'Cerrar sesión',
+                          color: AppColors.error,
+                          onTap: _confirmarCerrarSesion,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Widgets internos ──────────────────────────────────────────────────────
+
+class _TarjetaCompletitud extends StatelessWidget {
+  final int completitud;
+  final VoidCallback onCompletar;
+  const _TarjetaCompletitud(
+      {required this.completitud, required this.onCompletar});
+
+  Color get _color {
+    if (completitud >= 80) return Colors.green;
+    if (completitud >= 40) return Colors.orange;
+    return AppColors.error;
+  }
+
+  String get _mensaje {
+    if (completitud == 100) {
+      return '¡Perfil completo! Tienes más visibilidad ante empleadores.';
+    }
+    if (completitud >= 60) {
+      return 'Casi listo. Completa tu perfil para mejores resultados.';
+    }
+    return 'Tu perfil está incompleto. ¡Complétalo para destacar!';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.bar_chart_outlined, color: _color),
+              const SizedBox(width: 8),
+              const Text(
+                'Completitud del perfil',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              const Spacer(),
+              Text(
+                '$completitud%',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: _color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: completitud / 100,
+              minHeight: 8,
+              backgroundColor: const Color(0xFFE0E0E0),
+              color: _color,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            _mensaje,
+            style: const TextStyle(
+                fontSize: 13, color: AppColors.textSecondary),
+          ),
+          if (completitud < 100) ...[
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: onCompletar,
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: const Text('Completar ahora'),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                foregroundColor: AppColors.primary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SeccionTitulo extends StatelessWidget {
+  final String  titulo;
+  final IconData icono;
+  const _SeccionTitulo({required this.titulo, required this.icono});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      children: [
+        Icon(icono, size: 18, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Text(
+          titulo,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textSecondary,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _CampoInfo {
+  final String   label;
+  final String?  valor;
+  final IconData icono;
+  const _CampoInfo(this.label, this.valor, this.icono);
+}
+
+class _TarjetaInfo extends StatelessWidget {
+  final List<_CampoInfo> campos;
+  const _TarjetaInfo({required this.campos});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: campos.asMap().entries.map((entry) {
+          final i     = entry.key;
+          final campo = entry.value;
+          final vacio = campo.valor == null || campo.valor!.isEmpty;
+
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      campo.icono,
+                      size: 20,
+                      color: vacio
+                          ? AppColors.textSecondary
+                          : AppColors.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            campo.label,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            vacio ? 'No especificado' : campo.valor!,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: vacio
+                                  ? const Color(0xFFBDBDBD)
+                                  : AppColors.textPrimary,
+                              fontStyle: vacio
+                                  ? FontStyle.italic
+                                  : FontStyle.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (i < campos.length - 1)
+                const Divider(height: 1, indent: 48),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _OpcionMenu {
+  final IconData     icono;
+  final String       label;
+  final Color        color;
+  final VoidCallback? onTap;
+  const _OpcionMenu({
+    required this.icono,
+    required this.label,
+    required this.color,
+    this.onTap,
+  });
+}
+
+class _TarjetaOpciones extends StatelessWidget {
+  final List<_OpcionMenu> opciones;
+  const _TarjetaOpciones({required this.opciones});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: opciones.asMap().entries.map((entry) {
+          final i  = entry.key;
+          final op = entry.value;
+          return Column(
+            children: [
+              ListTile(
+                leading: Icon(op.icono, color: op.color),
+                title: Text(
+                  op.label,
+                  style: TextStyle(color: op.color, fontSize: 14),
+                ),
+                trailing: op.onTap != null
+                    ? Icon(Icons.chevron_right, color: op.color)
+                    : null,
+                onTap: op.onTap,
+                dense: true,
+              ),
+              if (i < opciones.length - 1)
+                const Divider(height: 1, indent: 56),
+            ],
+          );
+        }).toList(),
       ),
     );
   }

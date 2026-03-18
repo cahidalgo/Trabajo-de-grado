@@ -37,6 +37,25 @@ class UsuarioRepository {
     return Usuario.fromMap(result.first);
   }
 
+  // Obtener usuario por ID (para mostrar en perfil)
+  Future<Usuario?> obtenerPorId(int id) async {
+    final db = await _db.database;
+    final result = await db.query('usuarios', where: 'id = ?', whereArgs: [id]);
+    if (result.isEmpty) return null;
+    return Usuario.fromMap(result.first);
+  }
+
+  // Actualizar nombre completo
+  Future<void> actualizarNombre(int id, String nuevoNombre) async {
+    final db = await _db.database;
+    await db.update(
+      'usuarios',
+      {'nombreCompleto': nuevoNombre},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<void> registrarConsentimiento(int usuarioId) async {
     final db = await _db.database;
     await db.insert('consentimientos_privacidad', {

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_strings.dart';
@@ -68,11 +67,8 @@ class _RegistroScreenState extends State<RegistroScreen> {
       builder: (_) => AlertDialog(
         title: const Text('Política de privacidad'),
         content: const SingleChildScrollView(
-          child: Text(
-            'Tus datos personales serán tratados conforme a la Ley 1581 de 2012 '
-            'y el Decreto 1377 de 2013. Solo se usarán para conectarte con '
-            'oportunidades laborales. Puedes consultarlos, actualizarlos o '
-            'eliminarlos desde tu perfil en cualquier momento.',
+            child: Text(
+            'Aviso de privacidad: Al registrarte en [], autorizas el tratamiento de tus datos personales para crear tu perfil, permitir postulaciones a vacantes, hacer seguimiento de oportunidades laborales y mejorar el funcionamiento del MVP. Puedes conocer, actualizar, rectificar o solicitar la supresión de tus datos escribiendo a cahidalgo18@ucatolica.edu.co. Consulta la política completa aquí: [enlace o botón "Ver política de privacidad"].',
           ),
         ),
         actions: [
