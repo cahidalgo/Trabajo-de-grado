@@ -22,7 +22,7 @@ class VendedoresTMApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PostulacionViewModel()),
       ],
       child: MaterialApp.router(
-        title: 'Vendedores TM',
+        title: 'Formalia',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.theme,
         routerConfig: appRouter,

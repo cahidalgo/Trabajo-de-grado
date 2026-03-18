@@ -10,7 +10,7 @@
         android:maxSdkVersion="32"/>
 
     <application
-        android:label="mvp"
+        android:label="Formalia"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

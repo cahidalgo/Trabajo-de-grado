@@ -1,6 +1,6 @@
 class AppStrings {
   // Auth
-  static const appName        = 'Vendedores TM';
+  static const appName        = 'Formalia';
   static const registro       = 'Crear cuenta';
   static const login          = 'Iniciar sesión';
   static const correoLabel    = 'Correo o número de celular';
