@@ -8,7 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:mvp/main.dart';
+import 'package:formalia/main.dart';
 // Make sure that 'MyApp' is defined and exported in main.dart, or replace 'MyApp' below with the correct class name.
 
 void main() {
