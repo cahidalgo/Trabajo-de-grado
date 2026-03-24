@@ -16,17 +16,16 @@ class CompletarPerfilScreen extends StatefulWidget {
 }
 
 class _CompletarPerfilScreenState extends State<CompletarPerfilScreen> {
-  // Una clave de formulario POR PASO
-  final _formKey1 = GlobalKey<FormState>(); // Paso 1: Educación
-  final _formKey2 = GlobalKey<FormState>(); // Paso 2: Experiencia
-  final _formKey3 = GlobalKey<FormState>(); // Paso 3: Preferencias
+  final _formKey1 = GlobalKey<FormState>();
+  final _formKey2 = GlobalKey<FormState>();
+  final _formKey3 = GlobalKey<FormState>();
 
   final _experienciaCtrl = TextEditingController();
   final _habilidadesCtrl = TextEditingController();
 
-  int     _pasoActual         = 0;
+  int _pasoActual = 0;
   String? _nivelEducativo;
-  bool    _nivelError         = false; // error manual paso 1
+  bool _nivelError = false;
   final List<String> _areasSeleccionadas = [];
   String? _modalidadPreferida;
   String? _jornadaPreferida;
@@ -41,7 +40,7 @@ class _CompletarPerfilScreenState extends State<CompletarPerfilScreen> {
     'Construcción', 'Aseo y limpieza', 'Vigilancia', 'Otro',
   ];
   static const _modalidades = ['Presencial', 'Virtual', 'Híbrida'];
-  static const _jornadas    = ['Tiempo completo', 'Medio tiempo', 'Por horas'];
+  static const _jornadas = ['Tiempo completo', 'Medio tiempo', 'Por horas'];
 
   @override
   void dispose() {
@@ -50,11 +49,9 @@ class _CompletarPerfilScreenState extends State<CompletarPerfilScreen> {
     super.dispose();
   }
 
-  // Valida únicamente el paso actual
   bool _validarPasoActual() {
     switch (_pasoActual) {
       case 0:
-        // Paso 1: validación manual del nivel educativo
         if (_nivelEducativo == null) {
           setState(() => _nivelError = true);
           return false;
@@ -62,10 +59,8 @@ class _CompletarPerfilScreenState extends State<CompletarPerfilScreen> {
         setState(() => _nivelError = false);
         return true;
       case 1:
-        // Paso 2: validación del Form de experiencia
         return _formKey2.currentState?.validate() ?? false;
       case 2:
-        // Paso 3: sin campos obligatorios
         return true;
       default:
         return true;
@@ -74,11 +69,9 @@ class _CompletarPerfilScreenState extends State<CompletarPerfilScreen> {
 
   Future<void> _guardarYContinuar() async {
     if (!_validarPasoActual()) return;
-
-    final prefs     = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
     final usuarioId = prefs.getInt('usuarioId');
     if (usuarioId == null) return;
-
     final perfil = Perfil(
       usuarioId: usuarioId,
       nivelEducativo: _nivelEducativo,
@@ -89,7 +82,6 @@ class _CompletarPerfilScreenState extends State<CompletarPerfilScreen> {
       jornadaPreferida: _jornadaPreferida,
       perfilCompleto: true,
     );
-
     if (!mounted) return;
     await context.read<PerfilViewModel>().guardar(perfil);
     if (!mounted) return;
@@ -113,42 +105,46 @@ class _CompletarPerfilScreenState extends State<CompletarPerfilScreen> {
         actions: [
           TextButton(
             onPressed: () => context.go('/onboarding'),
-            child: const Text('Omitir', style: TextStyle(color: Colors.white)),
+            child: const Text('Omitir'),
           ),
         ],
       ),
       body: Column(
         children: [
-          // Barra de progreso
           LinearProgressIndicator(
             value: (_pasoActual + 1) / 3,
-            backgroundColor: const Color(0xFFE3F2FD),
-            color: AppColors.primary,
-            minHeight: 6,
+            minHeight: 4,
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Paso ${_pasoActual + 1} de 3',
-                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                Text(['Educación', 'Experiencia', 'Preferencias'][_pasoActual],
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(
+                  'Paso ${_pasoActual + 1} de 3',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                Text(
+                  ['Educación', 'Experiencia', 'Preferencias'][_pasoActual],
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
               ],
             ),
           ),
           const Divider(height: 1),
-
-          // Contenido del paso actual (NO IndexedStack — cambia el widget real)
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 250),
               child: _buildPasoActual(),
             ),
           ),
-
-          // Botones de navegación
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -160,9 +156,12 @@ class _CompletarPerfilScreenState extends State<CompletarPerfilScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFEBEE),
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.error.withOpacity(0.3)),
                     ),
-                    child: Text(vm.errorMsg ?? '',
-                        style: const TextStyle(color: Color(0xFFB00020))),
+                    child: Text(
+                      vm.errorMsg ?? '',
+                      style: const TextStyle(color: AppColors.error),
+                    ),
                   ),
                 Row(
                   children: [
@@ -182,9 +181,13 @@ class _CompletarPerfilScreenState extends State<CompletarPerfilScreen> {
                             : (_pasoActual < 2 ? _siguiente : _guardarYContinuar),
                         child: vm.state == PerfilState.loading
                             ? const SizedBox(
-                                height: 20, width: 20,
+                                height: 20,
+                                width: 20,
                                 child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2))
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
                             : Text(_pasoActual < 2 ? 'Siguiente' : 'Guardar perfil'),
                       ),
                     ),
@@ -200,23 +203,26 @@ class _CompletarPerfilScreenState extends State<CompletarPerfilScreen> {
 
   Widget _buildPasoActual() {
     switch (_pasoActual) {
-      case 0: return _Paso1Educacion(
+      case 0:
+        return _Paso1Educacion(
           key: const ValueKey('paso1'),
           niveles: _nivelesEducativos,
           seleccionado: _nivelEducativo,
           mostrarError: _nivelError,
           onSeleccionar: (v) => setState(() {
             _nivelEducativo = v;
-            _nivelError     = false;
+            _nivelError = false;
           }),
         );
-      case 1: return _Paso2Experiencia(
+      case 1:
+        return _Paso2Experiencia(
           key: const ValueKey('paso2'),
           formKey: _formKey2,
           experienciaCtrl: _experienciaCtrl,
           habilidadesCtrl: _habilidadesCtrl,
         );
-      case 2: return _Paso3Preferencias(
+      case 2:
+        return _Paso3Preferencias(
           key: const ValueKey('paso3'),
           areas: _areas,
           areasSeleccionadas: _areasSeleccionadas,
@@ -224,18 +230,18 @@ class _CompletarPerfilScreenState extends State<CompletarPerfilScreen> {
           jornadas: _jornadas,
           modalidadSeleccionada: _modalidadPreferida,
           jornadaSeleccionada: _jornadaPreferida,
-          onToggleArea: (area, v) => setState(() => v
-              ? _areasSeleccionadas.add(area)
-              : _areasSeleccionadas.remove(area)),
+          onToggleArea: (area, v) => setState(
+            () => v ? _areasSeleccionadas.add(area) : _areasSeleccionadas.remove(area),
+          ),
           onModalidad: (v) => setState(() => _modalidadPreferida = v),
-          onJornada:   (v) => setState(() => _jornadaPreferida   = v),
+          onJornada: (v) => setState(() => _jornadaPreferida = v),
         );
-      default: return const SizedBox.shrink();
+      default:
+        return const SizedBox.shrink();
     }
   }
 }
 
-// ── Paso 1: Educación ─────────────────────────────────────────────────────
 class _Paso1Educacion extends StatelessWidget {
   final List<String> niveles;
   final String? seleccionado;
@@ -257,22 +263,28 @@ class _Paso1Educacion extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('¿Cuál es tu nivel de estudio?',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text(
+            '¿Cuál es tu nivel de estudio?',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 6),
-          const Text('Selecciona el más alto que hayas alcanzado.',
-              style: TextStyle(color: AppColors.textSecondary)),
+          const Text(
+            'Selecciona el más alto que hayas alcanzado.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
           const SizedBox(height: 20),
           ...niveles.map((nivel) => _OpcionSeleccionable(
-            label: nivel,
-            seleccionado: seleccionado == nivel,
-            onTap: () => onSeleccionar(nivel),
-          )),
+                label: nivel,
+                seleccionado: seleccionado == nivel,
+                onTap: () => onSeleccionar(nivel),
+              )),
           if (mostrarError)
             const Padding(
               padding: EdgeInsets.only(top: 4),
-              child: Text('Selecciona una opción para continuar',
-                  style: TextStyle(color: Color(0xFFB00020), fontSize: 13)),
+              child: Text(
+                'Selecciona una opción para continuar',
+                style: TextStyle(color: AppColors.error, fontSize: 13),
+              ),
             ),
         ],
       ),
@@ -280,11 +292,10 @@ class _Paso1Educacion extends StatelessWidget {
   }
 }
 
-// ── Paso 2: Experiencia — CON VOZ en ambos campos ─────────────────────────
 class _Paso2Experiencia extends StatelessWidget {
-  final GlobalKey<FormState>   formKey;
-  final TextEditingController  experienciaCtrl;
-  final TextEditingController  habilidadesCtrl;
+  final GlobalKey<FormState> formKey;
+  final TextEditingController experienciaCtrl;
+  final TextEditingController habilidadesCtrl;
 
   const _Paso2Experiencia({
     super.key,
@@ -312,8 +323,6 @@ class _Paso2Experiencia extends StatelessWidget {
               style: TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 20),
-
-            // ── Experiencia laboral — CON VOZ ──────────────────────────
             VoiceInputField(
               controller: experienciaCtrl,
               labelText: 'Experiencia laboral',
@@ -322,8 +331,6 @@ class _Paso2Experiencia extends StatelessWidget {
               maxLines: 4,
             ),
             const SizedBox(height: 20),
-
-            // ── Habilidades — CON VOZ ──────────────────────────────────
             VoiceInputField(
               controller: habilidadesCtrl,
               labelText: 'Tus habilidades',
@@ -338,8 +345,6 @@ class _Paso2Experiencia extends StatelessWidget {
   }
 }
 
-
-// ── Paso 3: Preferencias ──────────────────────────────────────────────────
 class _Paso3Preferencias extends StatelessWidget {
   final List<String> areas;
   final List<String> areasSeleccionadas;
@@ -371,24 +376,27 @@ class _Paso3Preferencias extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('¿Qué tipo de trabajo buscas?',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text(
+            '¿Qué tipo de trabajo buscas?',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 6),
-          const Text('Esto nos ayuda a mostrarte las mejores vacantes para ti.',
-              style: TextStyle(color: AppColors.textSecondary)),
+          const Text(
+            'Esto nos ayuda a mostrarte las mejores vacantes para ti.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
           const SizedBox(height: 20),
           const Text('Áreas de interés', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Wrap(
-            spacing: 8, runSpacing: 8,
+            spacing: 8,
+            runSpacing: 8,
             children: areas.map((area) {
               final sel = areasSeleccionadas.contains(area);
               return FilterChip(
                 label: Text(area),
                 selected: sel,
                 onSelected: (v) => onToggleArea(area, v),
-                selectedColor: const Color(0xFFBBDEFB),
-                checkmarkColor: AppColors.primary,
               );
             }).toList(),
           ),
@@ -396,31 +404,33 @@ class _Paso3Preferencias extends StatelessWidget {
           const Text('Modalidad preferida', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           ...modalidades.map((m) => _OpcionSeleccionable(
-            label: m,
-            seleccionado: modalidadSeleccionada == m,
-            onTap: () => onModalidad(m),
-          )),
+                label: m,
+                seleccionado: modalidadSeleccionada == m,
+                onTap: () => onModalidad(m),
+              )),
           const SizedBox(height: 20),
           const Text('Jornada preferida', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           ...jornadas.map((j) => _OpcionSeleccionable(
-            label: j,
-            seleccionado: jornadaSeleccionada == j,
-            onTap: () => onJornada(j),
-          )),
+                label: j,
+                seleccionado: jornadaSeleccionada == j,
+                onTap: () => onJornada(j),
+              )),
         ],
       ),
     );
   }
 }
 
-// ── Widget compartido ─────────────────────────────────────────────────────
 class _OpcionSeleccionable extends StatelessWidget {
   final String label;
   final bool seleccionado;
   final VoidCallback onTap;
-  const _OpcionSeleccionable(
-      {required this.label, required this.seleccionado, required this.onTap});
+  const _OpcionSeleccionable({
+    required this.label,
+    required this.seleccionado,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -433,18 +443,22 @@ class _OpcionSeleccionable extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: seleccionado ? AppColors.primary : const Color(0xFFBDBDBD),
-            width: seleccionado ? 2 : 1,
+            color: seleccionado ? AppColors.primary : AppColors.border,
+            width: seleccionado ? 1.5 : 1,
           ),
-          color: seleccionado ? const Color(0xFFE3F2FD) : Colors.white,
+          color: seleccionado ? AppColors.primaryLight : Colors.white,
         ),
         child: Row(
           children: [
             Expanded(
-              child: Text(label,
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: seleccionado ? FontWeight.w600 : FontWeight.normal)),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: seleccionado ? FontWeight.w600 : FontWeight.normal,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ),
             if (seleccionado)
               const Icon(Icons.check_circle, color: AppColors.primary, size: 22),

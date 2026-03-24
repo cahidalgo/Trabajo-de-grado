@@ -3,11 +3,15 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
 
-class _OnboardingPage {
+class OnboardingPage {
   final IconData icon;
   final String titulo;
   final String descripcion;
-  const _OnboardingPage({required this.icon, required this.titulo, required this.descripcion});
+  const OnboardingPage({
+    required this.icon,
+    required this.titulo,
+    required this.descripcion,
+  });
 }
 
 class OnboardingScreen extends StatefulWidget {
@@ -22,20 +26,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _paginaActual = 0;
 
   final _paginas = const [
-    _OnboardingPage(
+    OnboardingPage(
       icon: Icons.work_outline,
       titulo: '¡Encuentra trabajo!',
-      descripcion: 'Mira vacantes disponibles y postúlate fácil, desde tu celular.',
+      descripcion:
+          'Mira vacantes disponibles y postúlate fácil, desde tu celular.',
     ),
-    _OnboardingPage(
+    OnboardingPage(
       icon: Icons.person_outline,
       titulo: 'Crea tu perfil',
-      descripcion: 'Cuéntanos tu experiencia y lo que sabes hacer para que te encuentren.',
+      descripcion:
+          'Cuéntanos tu experiencia y lo que sabes hacer para que te encuentren.',
     ),
-    _OnboardingPage(
+    OnboardingPage(
       icon: Icons.school_outlined,
       titulo: 'Aprende y crece',
-      descripcion: 'Accede a cursos y formación para mejorar tus oportunidades laborales.',
+      descripcion:
+          'Accede a cursos y formación para mejorar tus oportunidades laborales.',
     ),
   ];
 
@@ -51,7 +58,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Botón saltar (RF04: se puede omitir en cualquier momento)
+            // Botón saltar
             Align(
               alignment: Alignment.topRight,
               child: TextButton(
@@ -59,8 +66,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: const Text('Saltar'),
               ),
             ),
-
-            // Páginas de onboarding
+            // Páginas
             Expanded(
               child: PageView.builder(
                 controller: _controller,
@@ -73,46 +79,87 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(p.icon, size: 100, color: AppColors.primary),
+                        Container(
+                          width: 96,
+                          height: 96,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight,
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Icon(
+                            p.icon,
+                            size: 48,
+                            color: AppColors.primary,
+                          ),
+                        ),
                         const SizedBox(height: 32),
-                        Text(p.titulo, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                        Text(
+                          p.titulo,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                         const SizedBox(height: 16),
-                        Text(p.descripcion, style: const TextStyle(fontSize: 16, color: AppColors.textSecondary), textAlign: TextAlign.center),
+                        Text(
+                          p.descripcion,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: AppColors.textSecondary,
+                            height: 1.5,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                     ),
                   );
                 },
               ),
             ),
-
-            // Indicadores de página
+            // Indicadores
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(_paginas.length, (i) => AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: _paginaActual == i ? 24 : 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: _paginaActual == i ? AppColors.primary : AppColors.textSecondary,
-                  borderRadius: BorderRadius.circular(4),
+              children: List.generate(
+                _paginas.length,
+                (i) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: _paginaActual == i ? 24 : 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: _paginaActual == i
+                        ? AppColors.primary
+                        : AppColors.textDisabled,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                 ),
-              )),
+              ),
             ),
             const SizedBox(height: 32),
-
             // Botón siguiente / comenzar
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: ElevatedButton(
                 onPressed: () {
                   if (_paginaActual < _paginas.length - 1) {
-                    _controller.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeIn);
+                    _controller.nextPage(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeIn,
+                    );
                   } else {
                     _completar();
                   }
                 },
-                child: Text(_paginaActual < _paginas.length - 1 ? 'Siguiente' : 'Comenzar'),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
+                child: Text(
+                  _paginaActual < _paginas.length - 1
+                      ? 'Siguiente'
+                      : 'Comenzar',
+                ),
               ),
             ),
             const SizedBox(height: 24),

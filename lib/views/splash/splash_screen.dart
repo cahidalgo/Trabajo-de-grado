@@ -42,6 +42,7 @@ class _SplashScreenState extends State<SplashScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // ── Logo de la app ──────────────────────────────
+            
             Container(
               width: 120,
               height: 120,
@@ -50,17 +51,14 @@ class _SplashScreenState extends State<SplashScreen> {
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+                    color: Colors.black.withOpacity(0.08), // era 0.2
+                    blurRadius: 12,                         // era 20
+                    offset: const Offset(0, 4),             // era (0,8)
                   ),
                 ],
               ),
               padding: const EdgeInsets.all(16),
-              child: Image.asset(
-                'assets/icon/icon.png',
-                fit: BoxFit.contain,
-              ),
+              child: Image.asset('assets/icon/icon.png', fit: BoxFit.contain),
             ),
             const SizedBox(height: 24),
             const Text(

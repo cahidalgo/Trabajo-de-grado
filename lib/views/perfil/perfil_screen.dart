@@ -20,11 +20,11 @@ class PerfilScreen extends StatefulWidget {
 class _PerfilScreenState extends State<PerfilScreen>
     with AutomaticKeepAliveClientMixin {
   final _usuarioRepo = UsuarioRepository();
-  final _perfilRepo  = PerfilRepository();
+  final _perfilRepo = PerfilRepository();
 
   Usuario? _usuario;
-  Perfil?  _perfil;
-  bool     _cargando = true;
+  Perfil? _perfil;
+  bool _cargando = true;
 
   @override
   bool get wantKeepAlive => true;
@@ -37,11 +37,11 @@ class _PerfilScreenState extends State<PerfilScreen>
 
   Future<void> _cargar() async {
     setState(() => _cargando = true);
-    final prefs     = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
     final usuarioId = prefs.getInt('usuarioId');
     if (usuarioId != null) {
       _usuario = await _usuarioRepo.obtenerPorId(usuarioId);
-      _perfil  = await _perfilRepo.obtenerPorUsuario(usuarioId);
+      _perfil = await _perfilRepo.obtenerPorUsuario(usuarioId);
     }
     if (mounted) setState(() => _cargando = false);
   }
@@ -97,7 +97,9 @@ class _PerfilScreenState extends State<PerfilScreen>
               await context.read<AuthViewModel>().cerrarSesion();
               if (mounted) context.go('/login');
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+            ),
             child: const Text('Cerrar sesión'),
           ),
         ],
@@ -118,32 +120,23 @@ class _PerfilScreenState extends State<PerfilScreen>
     final completitud = _calcularCompletitud();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: AppColors.background,
       body: RefreshIndicator(
         onRefresh: _cargar,
         child: CustomScrollView(
           slivers: [
-            // ── AppBar expandible ────────────────────────────────────
             SliverAppBar(
               expandedHeight: 220,
               pinned: true,
               backgroundColor: AppColors.primary,
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Color(0xFF1976D2), Color(0xFF1565C0)],
-                    ),
-                  ),
+                  color: AppColors.primary,
                   child: SafeArea(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const SizedBox(height: 20),
-
-                        // ── Avatar con foto editable ─────────────────
                         AvatarPerfil(
                           iniciales: _iniciales(),
                           radius: 44,
@@ -151,8 +144,6 @@ class _PerfilScreenState extends State<PerfilScreen>
                           onFotoCambiada: (_) => setState(() {}),
                         ),
                         const SizedBox(height: 12),
-
-                        // ── Nombre ───────────────────────────────────
                         Text(
                           _usuario?.nombreCompleto ?? 'Sin nombre',
                           style: const TextStyle(
@@ -162,8 +153,6 @@ class _PerfilScreenState extends State<PerfilScreen>
                           ),
                         ),
                         const SizedBox(height: 2),
-
-                        // ── Correo / celular ─────────────────────────
                         Text(
                           _usuario?.correoOTelefono ?? '',
                           style: const TextStyle(
@@ -172,23 +161,24 @@ class _PerfilScreenState extends State<PerfilScreen>
                           ),
                         ),
                         const SizedBox(height: 12),
-
-                        // ── Chip de completitud ──────────────────────
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             completitud == 100
-                                ? '✅ Perfil completo'
-                                : '⚠️ Perfil $completitud% completo',
+                                ? '✓ Perfil completo'
+                                : 'Perfil $completitud% completo',
                             style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500),
+                              fontSize: 12,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ],
@@ -196,7 +186,6 @@ class _PerfilScreenState extends State<PerfilScreen>
                   ),
                 ),
               ),
-              // Botón editar en la barra cuando está colapsada
               actions: [
                 IconButton(
                   icon: const Icon(Icons.edit_outlined, color: Colors.white),
@@ -208,15 +197,12 @@ class _PerfilScreenState extends State<PerfilScreen>
                 ),
               ],
             ),
-
-            // ── Contenido ────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Barra de completitud ─────────────────────────
                     _TarjetaCompletitud(
                       completitud: completitud,
                       onCompletar: () async {
@@ -225,60 +211,30 @@ class _PerfilScreenState extends State<PerfilScreen>
                       },
                     ),
                     const SizedBox(height: 16),
-
-                    // ── Información laboral ──────────────────────────
                     const _SeccionTitulo(
                       titulo: 'Información laboral',
                       icono: Icons.work_outline,
                     ),
                     _TarjetaInfo(
                       campos: [
-                        _CampoInfo(
-                          'Nivel educativo',
-                          _perfil?.nivelEducativo,
-                          Icons.school_outlined,
-                        ),
-                        _CampoInfo(
-                          'Experiencia laboral',
-                          _perfil?.experienciaLaboral,
-                          Icons.history_edu_outlined,
-                        ),
-                        _CampoInfo(
-                          'Habilidades',
-                          _perfil?.habilidades,
-                          Icons.star_outline,
-                        ),
-                        _CampoInfo(
-                          'Áreas de interés',
-                          _perfil?.areasInteres,
-                          Icons.category_outlined,
-                        ),
+                        _CampoInfo('Nivel educativo', _perfil?.nivelEducativo, Icons.school_outlined),
+                        _CampoInfo('Experiencia laboral', _perfil?.experienciaLaboral, Icons.history_edu_outlined),
+                        _CampoInfo('Habilidades', _perfil?.habilidades, Icons.star_outline),
+                        _CampoInfo('Áreas de interés', _perfil?.areasInteres, Icons.category_outlined),
                       ],
                     ),
                     const SizedBox(height: 16),
-
-                    // ── Preferencias ─────────────────────────────────
                     const _SeccionTitulo(
                       titulo: 'Preferencias de trabajo',
                       icono: Icons.tune_outlined,
                     ),
                     _TarjetaInfo(
                       campos: [
-                        _CampoInfo(
-                          'Modalidad preferida',
-                          _perfil?.modalidadPreferida,
-                          Icons.laptop_outlined,
-                        ),
-                        _CampoInfo(
-                          'Jornada preferida',
-                          _perfil?.jornadaPreferida,
-                          Icons.schedule_outlined,
-                        ),
+                        _CampoInfo('Modalidad preferida', _perfil?.modalidadPreferida, Icons.laptop_outlined),
+                        _CampoInfo('Jornada preferida', _perfil?.jornadaPreferida, Icons.schedule_outlined),
                       ],
                     ),
                     const SizedBox(height: 16),
-
-                    // ── Botón editar perfil ──────────────────────────
                     ElevatedButton.icon(
                       onPressed: () async {
                         await context.push('/editar-perfil');
@@ -291,8 +247,6 @@ class _PerfilScreenState extends State<PerfilScreen>
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    // ── Cuenta ───────────────────────────────────────
                     const _SeccionTitulo(
                       titulo: 'Cuenta',
                       icono: Icons.settings_outlined,
@@ -307,8 +261,7 @@ class _PerfilScreenState extends State<PerfilScreen>
                         ),
                         _OpcionMenu(
                           icono: Icons.calendar_today_outlined,
-                          label:
-                              'Miembro desde: ${_formatFecha(_usuario?.fechaRegistro)}',
+                          label: 'Miembro desde: ${_formatFecha(_usuario?.fechaRegistro)}',
                           color: AppColors.textSecondary,
                           onTap: null,
                         ),
@@ -332,27 +285,20 @@ class _PerfilScreenState extends State<PerfilScreen>
   }
 }
 
-// ── Widgets internos ──────────────────────────────────────────────────────
-
 class _TarjetaCompletitud extends StatelessWidget {
   final int completitud;
   final VoidCallback onCompletar;
-  const _TarjetaCompletitud(
-      {required this.completitud, required this.onCompletar});
+  const _TarjetaCompletitud({required this.completitud, required this.onCompletar});
 
   Color get _color {
-    if (completitud >= 80) return Colors.green;
-    if (completitud >= 40) return Colors.orange;
+    if (completitud >= 80) return AppColors.success;
+    if (completitud >= 40) return AppColors.warning;
     return AppColors.error;
   }
 
   String get _mensaje {
-    if (completitud == 100) {
-      return '¡Perfil completo! Tienes más visibilidad ante empleadores.';
-    }
-    if (completitud >= 60) {
-      return 'Casi listo. Completa tu perfil para mejores resultados.';
-    }
+    if (completitud == 100) return '¡Perfil completo! Tienes más visibilidad ante empleadores.';
+    if (completitud >= 60) return 'Casi listo. Completa tu perfil para mejores resultados.';
     return 'Tu perfil está incompleto. ¡Complétalo para destacar!';
   }
 
@@ -362,14 +308,8 @@ class _TarjetaCompletitud extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -399,15 +339,14 @@ class _TarjetaCompletitud extends StatelessWidget {
             child: LinearProgressIndicator(
               value: completitud / 100,
               minHeight: 8,
-              backgroundColor: const Color(0xFFE0E0E0),
+              backgroundColor: AppColors.border,
               color: _color,
             ),
           ),
           const SizedBox(height: 10),
           Text(
             _mensaje,
-            style: const TextStyle(
-                fontSize: 13, color: AppColors.textSecondary),
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           if (completitud < 100) ...[
             const SizedBox(height: 10),
@@ -415,10 +354,7 @@ class _TarjetaCompletitud extends StatelessWidget {
               onPressed: onCompletar,
               icon: const Icon(Icons.edit_outlined, size: 16),
               label: const Text('Completar ahora'),
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                foregroundColor: AppColors.primary,
-              ),
+              style: TextButton.styleFrom(padding: EdgeInsets.zero),
             ),
           ],
         ],
@@ -428,34 +364,34 @@ class _TarjetaCompletitud extends StatelessWidget {
 }
 
 class _SeccionTitulo extends StatelessWidget {
-  final String  titulo;
+  final String titulo;
   final IconData icono;
   const _SeccionTitulo({required this.titulo, required this.icono});
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Row(
-      children: [
-        Icon(icono, size: 18, color: AppColors.primary),
-        const SizedBox(width: 8),
-        Text(
-          titulo,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textSecondary,
-            letterSpacing: 0.3,
-          ),
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            Icon(icono, size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text(
+              titulo,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textSecondary,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
         ),
-      ],
-    ),
-  );
+      );
 }
 
 class _CampoInfo {
-  final String   label;
-  final String?  valor;
+  final String label;
+  final String? valor;
   final IconData icono;
   const _CampoInfo(this.label, this.valor, this.icono);
 }
@@ -469,35 +405,25 @@ class _TarjetaInfo extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         children: campos.asMap().entries.map((entry) {
-          final i     = entry.key;
+          final i = entry.key;
           final campo = entry.value;
           final vacio = campo.valor == null || campo.valor!.isEmpty;
-
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
                       campo.icono,
                       size: 20,
-                      color: vacio
-                          ? AppColors.textSecondary
-                          : AppColors.primary,
+                      color: vacio ? AppColors.textSecondary : AppColors.primary,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -517,12 +443,8 @@ class _TarjetaInfo extends StatelessWidget {
                             vacio ? 'No especificado' : campo.valor!,
                             style: TextStyle(
                               fontSize: 14,
-                              color: vacio
-                                  ? const Color(0xFFBDBDBD)
-                                  : AppColors.textPrimary,
-                              fontStyle: vacio
-                                  ? FontStyle.italic
-                                  : FontStyle.normal,
+                              color: vacio ? AppColors.textDisabled : AppColors.textPrimary,
+                              fontStyle: vacio ? FontStyle.italic : FontStyle.normal,
                             ),
                           ),
                         ],
@@ -542,9 +464,9 @@ class _TarjetaInfo extends StatelessWidget {
 }
 
 class _OpcionMenu {
-  final IconData     icono;
-  final String       label;
-  final Color        color;
+  final IconData icono;
+  final String label;
+  final Color color;
   final VoidCallback? onTap;
   const _OpcionMenu({
     required this.icono,
@@ -563,27 +485,18 @@ class _TarjetaOpciones extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         children: opciones.asMap().entries.map((entry) {
-          final i  = entry.key;
+          final i = entry.key;
           final op = entry.value;
           return Column(
             children: [
               ListTile(
                 leading: Icon(op.icono, color: op.color),
-                title: Text(
-                  op.label,
-                  style: TextStyle(color: op.color, fontSize: 14),
-                ),
+                title: Text(op.label, style: TextStyle(color: op.color, fontSize: 14)),
                 trailing: op.onTap != null
                     ? Icon(Icons.chevron_right, color: op.color)
                     : null,

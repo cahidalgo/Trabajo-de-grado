@@ -14,7 +14,6 @@ class _HistorialScreenState extends State<HistorialScreen> {
   @override
   void initState() {
     super.initState();
-    // Carga el historial al abrir la pantalla
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PostulacionViewModel>().cargarHistorial();
     });
@@ -22,21 +21,21 @@ class _HistorialScreenState extends State<HistorialScreen> {
 
   Color _colorEstado(String estado) {
     switch (estado.toLowerCase()) {
-      case 'enviada':  return Colors.blue;
-      case 'vista':    return Colors.orange;
-      case 'aceptada': return Colors.green;
-      case 'rechazada':return Colors.red;
-      default:         return Colors.grey;
+      case 'enviada':   return Colors.blue;
+      case 'vista':     return Colors.orange;
+      case 'aceptada':  return AppColors.success;
+      case 'rechazada': return AppColors.error;
+      default:          return AppColors.textSecondary;
     }
   }
 
   IconData _iconoEstado(String estado) {
     switch (estado.toLowerCase()) {
-      case 'enviada':  return Icons.send_outlined;
-      case 'vista':    return Icons.visibility_outlined;
-      case 'aceptada': return Icons.check_circle_outline;
-      case 'rechazada':return Icons.cancel_outlined;
-      default:         return Icons.help_outline;
+      case 'enviada':   return Icons.send_outlined;
+      case 'vista':     return Icons.visibility_outlined;
+      case 'aceptada':  return Icons.check_circle_outline;
+      case 'rechazada': return Icons.cancel_outlined;
+      default:          return Icons.help_outline;
     }
   }
 
@@ -73,13 +72,17 @@ class _HistorialScreenState extends State<HistorialScreen> {
                     children: [
                       Icon(Icons.list_alt_outlined, size: 64, color: AppColors.textSecondary),
                       SizedBox(height: 16),
-                      Text('Aún no te has postulado a ninguna vacante',
-                          style: TextStyle(fontSize: 16),
-                          textAlign: TextAlign.center),
+                      Text(
+                        'Aún no te has postulado a ninguna vacante',
+                        style: TextStyle(fontSize: 16),
+                        textAlign: TextAlign.center,
+                      ),
                       SizedBox(height: 8),
-                      Text('Explora las vacantes disponibles y postúlate.',
-                          style: TextStyle(color: AppColors.textSecondary),
-                          textAlign: TextAlign.center),
+                      Text(
+                        'Explora las vacantes disponibles y postúlate.',
+                        style: TextStyle(color: AppColors.textSecondary),
+                        textAlign: TextAlign.center,
+                      ),
                     ],
                   ),
                 )
@@ -88,17 +91,19 @@ class _HistorialScreenState extends State<HistorialScreen> {
                   child: ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: vm.historial.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (_, i) {
-                      final p      = vm.historial[i];
+                      final p = vm.historial[i];
                       final estado = p['estado'] as String? ?? 'Enviada';
-                      final color  = _colorEstado(estado);
-                      final icono  = _iconoEstado(estado);
+                      final color = _colorEstado(estado);
+                      final icono = _iconoEstado(estado);
 
-                      return Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Row(
@@ -106,7 +111,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
                             children: [
                               CircleAvatar(
                                 radius: 22,
-                                backgroundColor: color.withOpacity(0.12),
+                                backgroundColor: color.withOpacity(0.1),
                                 child: Icon(icono, color: color, size: 22),
                               ),
                               const SizedBox(width: 14),
@@ -114,40 +119,53 @@ class _HistorialScreenState extends State<HistorialScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(p['titulo'] ?? '',
-                                        style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.bold)),
+                                    Text(
+                                      p['titulo'] ?? '',
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
                                     const SizedBox(height: 2),
-                                    Text(p['empresa'] ?? '',
-                                        style: const TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 13)),
+                                    Text(
+                                      p['empresa'] ?? '',
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
                                     const SizedBox(height: 8),
                                     Row(
                                       children: [
                                         Container(
                                           padding: const EdgeInsets.symmetric(
-                                              horizontal: 10, vertical: 3),
+                                            horizontal: 10,
+                                            vertical: 3,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: color.withOpacity(0.1),
+                                            color: color.withOpacity(0.08),
                                             borderRadius: BorderRadius.circular(20),
                                             border: Border.all(
-                                                color: color.withOpacity(0.4)),
+                                              color: color.withOpacity(0.3),
+                                            ),
                                           ),
-                                          child: Text(estado,
-                                              style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: color,
-                                                  fontWeight: FontWeight.w600)),
+                                          child: Text(
+                                            estado,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: color,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
                                         ),
                                         const Spacer(),
                                         Text(
-                                          _formatFecha(
-                                              p['fechaPostulacion'] as String? ?? ''),
+                                          _formatFecha(p['fechaPostulacion'] as String? ?? ''),
                                           style: const TextStyle(
-                                              fontSize: 12,
-                                              color: AppColors.textSecondary),
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary,
+                                          ),
                                         ),
                                       ],
                                     ),

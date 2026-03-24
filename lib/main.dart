@@ -24,7 +24,7 @@ class VendedoresTMApp extends StatelessWidget {
       child: MaterialApp.router(
         title: 'Formalia',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.theme,
+         theme: AppTheme.lightTheme,
         routerConfig: appRouter,
       ),
     );
