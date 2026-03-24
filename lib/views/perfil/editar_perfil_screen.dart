@@ -5,7 +5,6 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/validators.dart';
 import '../../core/widgets/voice_input_field.dart';
 import '../../data/models/perfil.dart';
-import '../../data/models/usuario.dart';
 import '../../data/repositories/usuario_repository.dart';
 import '../../viewmodels/perfil_viewmodel.dart';
 import '../../core/widgets/avatar_perfil.dart';

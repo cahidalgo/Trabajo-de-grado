@@ -91,7 +91,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
                   child: ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: vm.historial.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (_, i) {
                       final p = vm.historial[i];
                       final estado = p['estado'] as String? ?? 'Enviada';
