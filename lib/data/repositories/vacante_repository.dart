@@ -5,17 +5,31 @@ class VacanteRepository {
   final _db = DatabaseHelper();
 
   Future<List<Vacante>> obtenerTodas({
-    String? categoria,
-    String? modalidad,
-    String? jornada,
+    List<String>? categorias,
+    List<String>? modalidades,
+    List<String>? jornadas,
   }) async {
     final db = await _db.database;
     final conditions = <String>['activa = 1'];
     final args = <dynamic>[];
 
-    if (categoria != null) { conditions.add('categoria = ?'); args.add(categoria); }
-    if (modalidad != null) { conditions.add('modalidad = ?'); args.add(modalidad); }
-    if (jornada   != null) { conditions.add('jornada = ?');   args.add(jornada); }
+    if (categorias != null && categorias.isNotEmpty) {
+      final placeholders = List.filled(categorias.length, '?').join(', ');
+      conditions.add('LOWER(categoria) IN ($placeholders)');
+      args.addAll(categorias.map((c) => c.toLowerCase()));
+    }
+
+    if (modalidades != null && modalidades.isNotEmpty) {
+      final placeholders = List.filled(modalidades.length, '?').join(', ');
+      conditions.add('LOWER(modalidad) IN ($placeholders)');
+      args.addAll(modalidades.map((m) => m.toLowerCase()));
+    }
+
+    if (jornadas != null && jornadas.isNotEmpty) {
+      final placeholders = List.filled(jornadas.length, '?').join(', ');
+      conditions.add('LOWER(jornada) IN ($placeholders)');
+      args.addAll(jornadas.map((j) => j.toLowerCase()));
+    }
 
     final result = await db.query(
       'vacantes',
@@ -28,7 +42,8 @@ class VacanteRepository {
 
   Future<Vacante?> obtenerPorId(int id) async {
     final db = await _db.database;
-    final result = await db.query('vacantes', where: 'id = ?', whereArgs: [id]);
+    final result =
+        await db.query('vacantes', where: 'id = ?', whereArgs: [id]);
     if (result.isEmpty) return null;
     return Vacante.fromMap(result.first);
   }

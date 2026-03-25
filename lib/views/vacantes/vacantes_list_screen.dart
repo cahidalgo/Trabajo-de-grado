@@ -15,10 +15,13 @@ class _VacantesListScreenState extends State<VacantesListScreen> {
   final _repo = VacanteRepository();
   List<Vacante> _vacantes = [];
   bool _cargando = true;
-  String? _filtroCategoria;
-  String? _filtroModalidad;
 
-  static const _categorias = ['ventas', 'gastronomía', 'logística', 'servicios'];
+  final List<String> _filtrosCategorias = [];
+  final List<String> _filtrosModalidades = [];
+
+  static const _categorias = [
+    'ventas', 'gastronomía', 'logística', 'servicios', 'construcción'
+  ];
   static const _modalidades = ['presencial', 'virtual', 'híbrida'];
 
   @override
@@ -30,96 +33,60 @@ class _VacantesListScreenState extends State<VacantesListScreen> {
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     _vacantes = await _repo.obtenerTodas(
-      categoria: _filtroCategoria,
-      modalidad: _filtroModalidad,
+      categorias: _filtrosCategorias.isEmpty ? null : _filtrosCategorias,
+      modalidades: _filtrosModalidades.isEmpty ? null : _filtrosModalidades,
     );
     setState(() => _cargando = false);
   }
 
+  bool get _hayFiltros =>
+      _filtrosCategorias.isNotEmpty || _filtrosModalidades.isNotEmpty;
+
+  int get _totalFiltrosActivos =>
+      _filtrosCategorias.length + _filtrosModalidades.length;
+
+  void _limpiarFiltros() {
+    setState(() {
+      _filtrosCategorias.clear();
+      _filtrosModalidades.clear();
+    });
+    _cargar();
+  }
+
   void _mostrarFiltros() {
+    final tempCategorias = List<String>.from(_filtrosCategorias);
+    final tempModalidades = List<String>.from(_filtrosModalidades);
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setModalState) => Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Filtrar vacantes',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              const Text('Categoría', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: _categorias.map((c) => FilterChip(
-                  label: Text(c),
-                  selected: _filtroCategoria == c,
-                  onSelected: (v) {
-                    setModalState(() => _filtroCategoria = v ? c : null);
-                    setState(() {});
-                  },
-                )).toList(),
-              ),
-              const SizedBox(height: 16),
-              const Text('Modalidad', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: _modalidades.map((m) => FilterChip(
-                  label: Text(m),
-                  selected: _filtroModalidad == m,
-                  onSelected: (v) {
-                    setModalState(() => _filtroModalidad = v ? m : null);
-                    setState(() {});
-                  },
-                )).toList(),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setState(() {
-                          _filtroCategoria = null;
-                          _filtroModalidad = null;
-                        });
-                        Navigator.pop(context);
-                        _cargar();
-                      },
-                      child: const Text('Limpiar'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _cargar();
-                      },
-                      child: const Text('Aplicar'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+      builder: (ctx) => _FiltroModal(
+        tempCategorias: tempCategorias,
+        tempModalidades: tempModalidades,
+        categorias: _categorias,
+        modalidades: _modalidades,
+        onAplicar: (cats, mods) {
+          setState(() {
+            _filtrosCategorias
+              ..clear()
+              ..addAll(cats);
+            _filtrosModalidades
+              ..clear()
+              ..addAll(mods);
+          });
+          Navigator.pop(context);
+          _cargar();
+        },
+        onCancelar: () => Navigator.pop(context),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final hayFiltros = _filtroCategoria != null || _filtroModalidad != null;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Vacantes disponibles'),
@@ -131,83 +98,457 @@ class _VacantesListScreenState extends State<VacantesListScreen> {
                 onPressed: _mostrarFiltros,
                 tooltip: 'Filtros',
               ),
-              if (hayFiltros)
-                const Positioned(
-                  right: 10,
-                  top: 10,
-                  child: CircleAvatar(
-                    radius: 5,
-                    backgroundColor: AppColors.warning,
+              if (_hayFiltros)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: const BoxDecoration(
+                      color: AppColors.warning,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$_totalFiltrosActivos',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
             ],
           ),
         ],
       ),
-      body: _cargando
-          ? const Center(child: CircularProgressIndicator())
-          : _vacantes.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+      body: Column(
+        children: [
+          // ── Barra de filtros activos ─────────────────────────────
+          if (_hayFiltros)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      const Icon(Icons.search_off, size: 64, color: AppColors.textSecondary),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'No hay vacantes disponibles',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      if (hayFiltros) ...[
-                        const SizedBox(height: 8),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _filtroCategoria = null;
-                              _filtroModalidad = null;
-                            });
-                            _cargar();
-                          },
-                          child: const Text('Limpiar filtros'),
+                      Text(
+                        'Filtros activos ($_totalFiltrosActivos)',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
                         ),
-                      ],
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: _limpiarFiltros,
+                        child: const Text(
+                          'Limpiar todo',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _cargar,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 20,
-                    ),
-                    itemCount: _vacantes.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) => _TarjetaVacante(
-                      vacante: _vacantes[i],
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => VacanteDetalleScreen(vacanteId: _vacantes[i].id!),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      ..._filtrosCategorias.map(
+                        (c) => _FiltroActivo(
+                          label: c,
+                          onQuitar: () {
+                            setState(() => _filtrosCategorias.remove(c));
+                            _cargar();
+                          },
                         ),
-                      ).then((_) => _cargar()),
-                    ),
+                      ),
+                      ..._filtrosModalidades.map(
+                        (m) => _FiltroActivo(
+                          label: m,
+                          onQuitar: () {
+                            setState(() => _filtrosModalidades.remove(m));
+                            _cargar();
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                ],
+              ),
+            ),
+
+          if (_hayFiltros) const Divider(height: 1),
+
+          // ── Lista de vacantes ────────────────────────────────────
+          Expanded(
+            child: _cargando
+                ? const Center(child: CircularProgressIndicator())
+                : _vacantes.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.search_off,
+                                size: 64,
+                                color: AppColors.textSecondary),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No hay vacantes con esos filtros',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Intenta con otras combinaciones',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextButton.icon(
+                              onPressed: _limpiarFiltros,
+                              icon: const Icon(
+                                  Icons.filter_alt_off_outlined),
+                              label: const Text('Limpiar filtros'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _cargar,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 20),
+                          itemCount: _vacantes.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 14),
+                          itemBuilder: (_, i) => _TarjetaVacante(
+                            vacante: _vacantes[i],
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => VacanteDetalleScreen(
+                                  vacanteId: _vacantes[i].id!,
+                                ),
+                              ),
+                            ).then((_) => _cargar()),
+                          ),
+                        ),
+                      ),
+          ),
+        ],
+      ),
     );
   }
 }
 
+// ── Modal de filtros ──────────────────────────────────────────────────────────
+class _FiltroModal extends StatefulWidget {
+  final List<String> tempCategorias;
+  final List<String> tempModalidades;
+  final List<String> categorias;
+  final List<String> modalidades;
+  final void Function(List<String> cats, List<String> mods) onAplicar;
+  final VoidCallback onCancelar;
+
+  const _FiltroModal({
+    required this.tempCategorias,
+    required this.tempModalidades,
+    required this.categorias,
+    required this.modalidades,
+    required this.onAplicar,
+    required this.onCancelar,
+  });
+
+  @override
+  State<_FiltroModal> createState() => _FiltroModalState();
+}
+
+class _FiltroModalState extends State<_FiltroModal> {
+  late final List<String> _cats;
+  late final List<String> _mods;
+
+  @override
+  void initState() {
+    super.initState();
+    _cats = List<String>.from(widget.tempCategorias);
+    _mods = List<String>.from(widget.tempModalidades);
+  }
+
+  int get _total => _cats.length + _mods.length;
+
+  Widget _buildChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              const Icon(Icons.check, size: 14, color: Colors.white),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight:
+                    selected ? FontWeight.w600 : FontWeight.normal,
+                color: selected ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContador(int count) => Container(
+        margin: const EdgeInsets.only(left: 8),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          '$count',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Título + limpiar ───────────────────────────────────
+          Row(
+            children: [
+              const Text(
+                'Filtrar vacantes',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              if (_total > 0)
+                TextButton(
+                  onPressed: () => setState(() {
+                    _cats.clear();
+                    _mods.clear();
+                  }),
+                  child: const Text('Limpiar todo'),
+                ),
+            ],
+          ),
+
+          if (_total > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                '$_total filtro(s) seleccionado(s)',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 8),
+
+          // ── Categorías ─────────────────────────────────────────
+          Row(
+            children: [
+              const Icon(Icons.category_outlined,
+                  size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              const Text(
+                'Categoría',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              if (_cats.isNotEmpty) _buildContador(_cats.length),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: widget.categorias.map((c) {
+              final sel = _cats.contains(c);
+              return _buildChip(
+                label: c,
+                selected: sel,
+                onTap: () => setState(
+                  () => sel ? _cats.remove(c) : _cats.add(c),
+                ),
+              );
+            }).toList(),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── Modalidades ────────────────────────────────────────
+          Row(
+            children: [
+              const Icon(Icons.laptop_outlined,
+                  size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              const Text(
+                'Modalidad',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              if (_mods.isNotEmpty) _buildContador(_mods.length),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: widget.modalidades.map((m) {
+              final sel = _mods.contains(m);
+              return _buildChip(
+                label: m,
+                selected: sel,
+                onTap: () => setState(
+                  () => sel ? _mods.remove(m) : _mods.add(m),
+                ),
+              );
+            }).toList(),
+          ),
+
+          const SizedBox(height: 24),
+
+          // ── Botones ────────────────────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: widget.onCancelar,
+                  child: const Text('Cancelar'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: () => widget.onAplicar(_cats, _mods),
+                  child: Text(
+                    _total == 0 ? 'Ver todas' : 'Aplicar filtros',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Chip de filtro activo con X ───────────────────────────────────────────────
+class _FiltroActivo extends StatelessWidget {
+  final String label;
+  final VoidCallback onQuitar;
+  const _FiltroActivo({required this.label, required this.onQuitar});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding:
+          const EdgeInsets.only(left: 10, right: 4, top: 4, bottom: 4),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onQuitar,
+            child: const CircleAvatar(
+              radius: 9,
+              backgroundColor: AppColors.primary,
+              child: Icon(Icons.close, size: 11, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Tarjeta de vacante ────────────────────────────────────────────────────────
 class _TarjetaVacante extends StatelessWidget {
   final Vacante vacante;
   final VoidCallback onTap;
   const _TarjetaVacante({required this.vacante, required this.onTap});
 
   static const _coloresCat = {
-    'ventas':       Color(0xFF1565C0),
-    'gastronomía':  Color(0xFFE65100),
-    'logística':    Color(0xFF2E7D32),
-    'servicios':    Color(0xFF6A1B9A),
-    'construcción': Color(0xFFBF360C),
+    'ventas':       [Color(0xFFE3F2FD), Color(0xFF1565C0)],
+    'gastronomía':  [Color(0xFFFFF3E0), Color(0xFFE65100)],
+    'logística':    [Color(0xFFE8F5E9), Color(0xFF2E7D32)],
+    'servicios':    [Color(0xFFF3E5F5), Color(0xFF6A1B9A)],
+    'construcción': [Color(0xFFFBE9E7), Color(0xFFBF360C)],
   };
 
   static const _iconosCat = {
@@ -221,119 +562,121 @@ class _TarjetaVacante extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cat = vacante.categoria?.toLowerCase() ?? '';
-    final acColor = _coloresCat[cat] ?? AppColors.primary;
+    final colores =
+        _coloresCat[cat] ?? [const Color(0xFFF5F5F5), AppColors.primary];
     final icono = _iconosCat[cat] ?? Icons.work_outline;
+    final bgColor = colores[0] as Color;
+    final acColor = colores[1] as Color;
 
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
+      elevation: 3,
+      shadowColor: acColor.withOpacity(0.2),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white,
           ),
-          child: IntrinsicHeight(
-            child: Row(
-              children: [
-                Container(
-                  width: 5,
-                  decoration: BoxDecoration(
-                    color: acColor,
-                    borderRadius: const BorderRadius.horizontal(
-                      left: Radius.circular(12),
-                    ),
-                  ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(16)),
                 ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CircleAvatar(
-                          radius: 20,
-                          backgroundColor: acColor.withOpacity(0.1),
-                          child: Icon(icono, color: acColor, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                vacante.titulo,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                vacante.empresa ?? '',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 4,
-                                children: [
-                                  if (vacante.modalidad != null)
-                                    _PillChip(vacante.modalidad!, acColor),
-                                  if (vacante.jornada != null)
-                                    _PillChip(vacante.jornada!, acColor),
-                                  if (vacante.categoria != null)
-                                    _PillChip(vacante.categoria!, acColor),
-                                ],
-                              ),
-                              if (vacante.salarioReferencial != null) ...[
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Icon(Icons.attach_money, size: 15, color: acColor),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      vacante.salarioReferencial!,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        color: acColor,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    if (vacante.fechaCierre != null)
-                                      Text(
-                                        'Cierre: ${vacante.fechaCierre}',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ],
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: acColor.withOpacity(0.15),
+                      child: Icon(icono, color: acColor, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            vacante.titulo,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: acColor,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        const Icon(
-                          Icons.chevron_right,
-                          color: AppColors.textSecondary,
-                          size: 20,
-                        ),
+                          const SizedBox(height: 2),
+                          Text(
+                            vacante.empresa ?? '',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right,
+                        color: AppColors.textSecondary),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        if (vacante.modalidad != null)
+                          _PillChip(vacante.modalidad!, acColor),
+                        if (vacante.jornada != null)
+                          _PillChip(vacante.jornada!, acColor),
+                        if (vacante.categoria != null)
+                          _PillChip(vacante.categoria!, acColor),
                       ],
                     ),
-                  ),
+                    if (vacante.salarioReferencial != null) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Icon(Icons.attach_money,
+                              size: 16, color: acColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            vacante.salarioReferencial!,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: acColor,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (vacante.fechaCierre != null)
+                            Text(
+                              'Cierre: ${vacante.fechaCierre}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -341,6 +684,7 @@ class _TarjetaVacante extends StatelessWidget {
   }
 }
 
+// ── Pill chip ─────────────────────────────────────────────────────────────────
 class _PillChip extends StatelessWidget {
   final String label;
   final Color color;
@@ -348,15 +692,19 @@ class _PillChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.25)),
+          border: Border.all(color: color.withOpacity(0.3)),
         ),
         child: Text(
           label,
-          style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: 11,
+            color: color,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       );
 }
