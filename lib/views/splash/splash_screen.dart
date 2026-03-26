@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_strings.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -20,11 +21,19 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _redirigir() async {
     await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
-    final prefs           = await SharedPreferences.getInstance();
-    final usuarioId       = prefs.getInt('usuarioId');
+    final prefs = await SharedPreferences.getInstance();
+    final usuarioId = prefs.getInt('usuarioId');
+    final empresaId = prefs.getInt('empresaId');
+    final rolUsuario = prefs.getString('rolUsuario');
     final onboardingHecho = prefs.getBool('onboarding_completado') ?? false;
     if (!mounted) return;
-    if (usuarioId != null) {
+    if (rolUsuario == 'empresa' && empresaId != null) {
+      context.go('/empresa/dashboard');
+    } else if (rolUsuario == 'vendedor' && usuarioId != null) {
+      context.go('/home');
+    } else if (empresaId != null) {
+      context.go('/empresa/dashboard');
+    } else if (usuarioId != null) {
       context.go('/home');
     } else if (!onboardingHecho) {
       context.go('/registro');
@@ -62,7 +71,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 24),
             const Text(
-              'Vendedores TM',
+              AppStrings.appName,
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,

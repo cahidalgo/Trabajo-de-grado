@@ -232,7 +232,7 @@ class _VacantesListScreenState extends State<VacantesListScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 20),
                           itemCount: _vacantes.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (_, _) =>
                               const SizedBox(height: 14),
                           itemBuilder: (_, i) => _TarjetaVacante(
                             vacante: _vacantes[i],
@@ -565,8 +565,8 @@ class _TarjetaVacante extends StatelessWidget {
     final colores =
         _coloresCat[cat] ?? [const Color(0xFFF5F5F5), AppColors.primary];
     final icono = _iconosCat[cat] ?? Icons.work_outline;
-    final bgColor = colores[0] as Color;
-    final acColor = colores[1] as Color;
+    final bgColor = colores[0];
+    final acColor = colores[1];
 
     return Material(
       borderRadius: BorderRadius.circular(16),

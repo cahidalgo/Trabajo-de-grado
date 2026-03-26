@@ -8,13 +8,12 @@ import 'viewmodels/postulacion_viewmodel.dart';
 import 'viewmodels/empresa_viewmodel.dart';
 import 'viewmodels/vacante_empresa_viewmodel.dart';
 
-
 void main() {
-  runApp(const VendedoresTMApp());
+  runApp(const FormaliaApp());
 }
 
-class VendedoresTMApp extends StatelessWidget {
-  const VendedoresTMApp({super.key});
+class FormaliaApp extends StatelessWidget {
+  const FormaliaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -34,4 +33,9 @@ class VendedoresTMApp extends StatelessWidget {
       ),
     );
   }
+}
+
+@Deprecated('Use FormaliaApp')
+class VendedoresTMApp extends FormaliaApp {
+  const VendedoresTMApp({super.key});
 }

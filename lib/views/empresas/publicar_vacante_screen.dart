@@ -5,6 +5,7 @@ import '../../viewmodels/empresa_viewmodel.dart';
 import '../../viewmodels/vacante_empresa_viewmodel.dart';
 import '../../data/models/vacante_empresa_model.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/app_ui.dart';
 import '../../core/widgets/etiqueta_inclusion_chip.dart';
 
 class PublicarVacanteScreen extends StatefulWidget {
@@ -31,6 +32,14 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
   bool _aceptaPepPpt = false;
   bool _horarioFlexible = false;
   bool _incluyeFormacion = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<EmpresaViewModel>().restaurarSesion();
+    });
+  }
 
   final _sectores = [
     'Ventas y comercio', 'Logística', 'Gastronomía',
@@ -72,8 +81,15 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
       return;
     }
 
-    final empresaId =
-        context.read<EmpresaViewModel>().empresaActual!.id!;
+    final empresaId = context.read<EmpresaViewModel>().empresaActual?.id;
+    if (empresaId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No encontramos la sesión de empresa.'),
+        ),
+      );
+      return;
+    }
 
     final vacante = VacanteEmpresaModel(
       empresaId: empresaId,
@@ -107,7 +123,30 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final empresaVm = context.watch<EmpresaViewModel>();
     final vm = context.watch<VacanteEmpresaViewModel>();
+
+    if (empresaVm.cargando && empresaVm.empresaActual == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (empresaVm.empresaActual == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Publicar vacante')),
+        body: AppEmptyState(
+          icon: Icons.business_center_outlined,
+          title: 'No hay una empresa cargada',
+          description:
+              'Vuelve a iniciar sesión para publicar vacantes desde tu panel empresarial.',
+          action: ElevatedButton(
+            onPressed: () => context.go('/login'),
+            child: const Text('Ir a iniciar sesión'),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Publicar vacante')),
@@ -149,7 +188,7 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
 
               // Sector
               DropdownButtonFormField<String>(
-                value: _sector,
+                initialValue: _sector,
                 decoration:
                     const InputDecoration(labelText: 'Sector'),
                 items: _sectores
@@ -162,7 +201,7 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
 
               // Modalidad — separado para evitar overflow
               DropdownButtonFormField<String>(
-                value: _modalidad,
+                initialValue: _modalidad,
                 decoration:
                     const InputDecoration(labelText: 'Modalidad'),
                 items: _modalidades
@@ -175,7 +214,7 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
 
               // Jornada — separado para evitar overflow
               DropdownButtonFormField<String>(
-                value: _jornada,
+                initialValue: _jornada,
                 decoration:
                     const InputDecoration(labelText: 'Jornada'),
                 items: _jornadas
@@ -198,7 +237,7 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
 
               // Portal
               DropdownButtonFormField<String>(
-                value: _zonaPortal,
+                initialValue: _zonaPortal,
                 decoration: const InputDecoration(
                     labelText: 'Portal/zona cercana (opcional)'),
                 items: _portales

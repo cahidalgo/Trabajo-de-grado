@@ -45,6 +45,7 @@ class AuthViewModel extends ChangeNotifier {
       final id = await _repo.insertar(usuario);
       await _repo.registrarConsentimiento(id);
       final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('empresaId');
       await prefs.setInt('usuarioId', id);
       await prefs.setString('rolUsuario', 'vendedor');
       _usuarioIdActual = id;
@@ -70,6 +71,7 @@ class AuthViewModel extends ChangeNotifier {
       final usuario = await _repo.buscarPorCredenciales(correoOTelefono.trim(), hash);
       if (usuario != null) {
         final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('empresaId');
         await prefs.setInt('usuarioId', usuario.id!);
         await prefs.setString('rolUsuario', 'vendedor');
         _usuarioIdActual = usuario.id;
@@ -82,6 +84,7 @@ class AuthViewModel extends ChangeNotifier {
       final empresa = await _empresaRepo.login(correoOTelefono.trim(), contrasena);
       if (empresa != null) {
         final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('usuarioId');
         await prefs.setInt('empresaId', empresa.id!);
         await prefs.setString('rolUsuario', 'empresa');
         _state = AuthState.loginEmpresa;

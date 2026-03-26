@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../data/repositories/empresa_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../data/models/empresa_model.dart';
+import '../data/repositories/empresa_repository.dart';
 
 class EmpresaViewModel extends ChangeNotifier {
   final EmpresaRepository _repo = EmpresaRepository();
@@ -8,6 +10,35 @@ class EmpresaViewModel extends ChangeNotifier {
   EmpresaModel? empresaActual;
   String? errorMensaje;
   bool cargando = false;
+
+  Future<void> _persistirSesion(int empresaId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('usuarioId');
+    await prefs.setInt('empresaId', empresaId);
+    await prefs.setString('rolUsuario', 'empresa');
+  }
+
+  Future<void> restaurarSesion() async {
+    if (empresaActual != null) return;
+
+    cargando = true;
+    errorMensaje = null;
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    final empresaId = prefs.getInt('empresaId');
+
+    if (empresaId != null) {
+      empresaActual = await _repo.obtenerPorId(empresaId);
+      if (empresaActual == null) {
+        await prefs.remove('empresaId');
+        await prefs.remove('rolUsuario');
+      }
+    }
+
+    cargando = false;
+    notifyListeners();
+  }
 
   Future<bool> registrar({
     required String razonSocial,
@@ -46,7 +77,6 @@ class EmpresaViewModel extends ChangeNotifier {
 
     final id = await _repo.registrarEmpresa(empresa);
 
-    // ✅ Asigna empresaActual con el id generado por SQLite
     empresaActual = EmpresaModel(
       id: id,
       razonSocial: razonSocial,
@@ -54,9 +84,10 @@ class EmpresaViewModel extends ChangeNotifier {
       sector: sector,
       correo: correo,
       telefono: telefono,
-      contrasenaHash: contrasena,
+      contrasenaHash: empresa.contrasenaHash,
       fechaRegistro: empresa.fechaRegistro,
     );
+    await _persistirSesion(id);
 
     cargando = false;
     notifyListeners();
@@ -75,13 +106,20 @@ class EmpresaViewModel extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+
     empresaActual = empresa;
+    await _persistirSesion(empresa.id!);
+
     cargando = false;
     notifyListeners();
     return true;
   }
 
-  void cerrarSesion() {
+  Future<void> cerrarSesion() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('usuarioId');
+    await prefs.remove('empresaId');
+    await prefs.remove('rolUsuario');
     empresaActual = null;
     notifyListeners();
   }

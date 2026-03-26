@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/app_ui.dart';
 import '../../viewmodels/postulacion_viewmodel.dart';
 
 class HistorialScreen extends StatefulWidget {
@@ -21,21 +23,31 @@ class _HistorialScreenState extends State<HistorialScreen> {
 
   Color _colorEstado(String estado) {
     switch (estado.toLowerCase()) {
-      case 'enviada':   return Colors.blue;
-      case 'vista':     return Colors.orange;
-      case 'aceptada':  return AppColors.success;
-      case 'rechazada': return AppColors.error;
-      default:          return AppColors.textSecondary;
+      case 'enviada':
+        return AppColors.primary;
+      case 'vista':
+        return AppColors.warning;
+      case 'aceptada':
+        return AppColors.success;
+      case 'rechazada':
+        return AppColors.error;
+      default:
+        return AppColors.textSecondary;
     }
   }
 
   IconData _iconoEstado(String estado) {
     switch (estado.toLowerCase()) {
-      case 'enviada':   return Icons.send_outlined;
-      case 'vista':     return Icons.visibility_outlined;
-      case 'aceptada':  return Icons.check_circle_outline;
-      case 'rechazada': return Icons.cancel_outlined;
-      default:          return Icons.help_outline;
+      case 'enviada':
+        return Icons.send_outlined;
+      case 'vista':
+        return Icons.visibility_outlined;
+      case 'aceptada':
+        return Icons.check_circle_outline;
+      case 'rechazada':
+        return Icons.cancel_outlined;
+      default:
+        return Icons.help_outline;
     }
   }
 
@@ -58,7 +70,8 @@ class _HistorialScreenState extends State<HistorialScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => context.read<PostulacionViewModel>().cargarHistorial(),
+            onPressed: () =>
+                context.read<PostulacionViewModel>().cargarHistorial(),
             tooltip: 'Actualizar',
           ),
         ],
@@ -66,114 +79,88 @@ class _HistorialScreenState extends State<HistorialScreen> {
       body: vm.state == PostulacionState.loading
           ? const Center(child: CircularProgressIndicator())
           : vm.historial.isEmpty
-              ? const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.list_alt_outlined, size: 64, color: AppColors.textSecondary),
-                      SizedBox(height: 16),
-                      Text(
-                        'Aún no te has postulado a ninguna vacante',
-                        style: TextStyle(fontSize: 16),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Explora las vacantes disponibles y postúlate.',
-                        style: TextStyle(color: AppColors.textSecondary),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
+              ? const AppEmptyState(
+                  icon: Icons.list_alt_outlined,
+                  title: 'Aún no te has postulado',
+                  description:
+                      'Explora vacantes disponibles y revisa aquí el seguimiento de cada proceso.',
                 )
               : RefreshIndicator(
-                  onRefresh: () => context.read<PostulacionViewModel>().cargarHistorial(),
+                  onRefresh: () =>
+                      context.read<PostulacionViewModel>().cargarHistorial(),
                   child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: vm.historial.length,
+                    padding: const EdgeInsets.all(20),
+                    itemCount: vm.historial.length + 1,
                     separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) {
-                      final p = vm.historial[i];
-                      final estado = p['estado'] as String? ?? 'Enviada';
+                    itemBuilder: (_, index) {
+                      if (index == 0) {
+                        return AppInfoBanner(
+                          title: 'Seguimiento de procesos',
+                          description:
+                              'Consulta el estado de cada postulación y mantén contexto de fechas y empresas.',
+                          icon: Icons.track_changes_outlined,
+                          color: AppColors.primary,
+                        );
+                      }
+
+                      final postulacion = vm.historial[index - 1];
+                      final estado =
+                          postulacion['estado'] as String? ?? 'Enviada';
                       final color = _colorEstado(estado);
                       final icono = _iconoEstado(estado);
 
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              CircleAvatar(
-                                radius: 22,
-                                backgroundColor: color.withOpacity(0.1),
-                                child: Icon(icono, color: color, size: 22),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      p['titulo'] ?? '',
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.textPrimary,
-                                      ),
+                      return AppSurfaceCard(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CircleAvatar(
+                              radius: 22,
+                              backgroundColor: color.withOpacity(0.1),
+                              child: Icon(icono, color: color, size: 22),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    postulacion['titulo'] ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      p['empresa'] ?? '',
-                                      style: const TextStyle(
-                                        color: AppColors.textSecondary,
-                                        fontSize: 13,
-                                      ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    postulacion['empresa'] ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.textSecondary,
                                     ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 3,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: color.withOpacity(0.08),
-                                            borderRadius: BorderRadius.circular(20),
-                                            border: Border.all(
-                                              color: color.withOpacity(0.3),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            estado,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: color,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      AppTag(label: estado, color: color),
+                                      const Spacer(),
+                                      Text(
+                                        _formatFecha(
+                                          postulacion['fechaPostulacion']
+                                                  as String? ??
+                                              '',
                                         ),
-                                        const Spacer(),
-                                        Text(
-                                          _formatFecha(p['fechaPostulacion'] as String? ?? ''),
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary,
-                                          ),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
                                         ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       );
                     },

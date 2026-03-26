@@ -3,10 +3,8 @@ import 'dart:convert';
 import '../models/empresa_model.dart';
 import '../database/database_helper.dart';
 
-
 class EmpresaRepository {
-  
-final DatabaseHelper _db = DatabaseHelper();
+  final DatabaseHelper _db = DatabaseHelper();
 
 
   String _hashPassword(String password) =>
@@ -14,7 +12,20 @@ final DatabaseHelper _db = DatabaseHelper();
 
   Future<int> registrarEmpresa(EmpresaModel empresa) async {
     final db = await _db.database;
-    return await db.insert('empresas', empresa.toMap());
+    return db.insert(
+      'empresas',
+      EmpresaModel(
+        id: empresa.id,
+        razonSocial: empresa.razonSocial,
+        nit: empresa.nit,
+        sector: empresa.sector,
+        correo: empresa.correo,
+        telefono: empresa.telefono,
+        contrasenaHash: _hashPassword(empresa.contrasenaHash),
+        validado: empresa.validado,
+        fechaRegistro: empresa.fechaRegistro,
+      ).toMap(),
+    );
   }
 
   Future<EmpresaModel?> login(String correo, String contrasena) async {
@@ -29,17 +40,28 @@ final DatabaseHelper _db = DatabaseHelper();
     return EmpresaModel.fromMap(result.first);
   }
 
+  Future<EmpresaModel?> obtenerPorId(int id) async {
+    final db = await _db.database;
+    final result = await db.query(
+      'empresas',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (result.isEmpty) return null;
+    return EmpresaModel.fromMap(result.first);
+  }
+
   Future<bool> nitExiste(String nit) async {
     final db = await _db.database;
-    final result = await db.query('empresas',
-        where: 'nit = ?', whereArgs: [nit]);
+    final result = await db.query('empresas', where: 'nit = ?', whereArgs: [nit]);
     return result.isNotEmpty;
   }
 
   Future<bool> correoExiste(String correo) async {
     final db = await _db.database;
-    final result = await db.query('empresas',
-        where: 'correo = ?', whereArgs: [correo]);
+    final result =
+        await db.query('empresas', where: 'correo = ?', whereArgs: [correo]);
     return result.isNotEmpty;
   }
 }
