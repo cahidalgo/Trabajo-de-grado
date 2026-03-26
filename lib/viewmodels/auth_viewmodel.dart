@@ -1,26 +1,28 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/repositories/usuario_repository.dart';
+import '../data/repositories/empresa_repository.dart';
 import '../data/models/usuario.dart';
 
-enum AuthState { idle, loading, registroExitoso, loginExitoso, error }
+enum AuthState { idle, loading, registroExitoso, loginExitoso, loginEmpresa, error }
 
 class AuthViewModel extends ChangeNotifier {
   final _repo = UsuarioRepository();
+  final _empresaRepo = EmpresaRepository();
 
   AuthState _state = AuthState.idle;
-  String?   _errorMsg;
-  int?      _usuarioIdActual;
+  String? _errorMsg;
+  int? _usuarioIdActual;
 
-  AuthState get state     => _state;
-  String?   get errorMsg  => _errorMsg;
-  int?      get usuarioId => _usuarioIdActual;
+  AuthState get state => _state;
+  String? get errorMsg => _errorMsg;
+  int? get usuarioId => _usuarioIdActual;
 
   Future<void> registrar({
     required String nombreCompleto,
     required String correoOTelefono,
     required String contrasena,
-    required bool   aceptoPolitica,
+    required bool aceptoPolitica,
   }) async {
     _state = AuthState.loading;
     notifyListeners();
@@ -44,6 +46,7 @@ class AuthViewModel extends ChangeNotifier {
       await _repo.registrarConsentimiento(id);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('usuarioId', id);
+      await prefs.setString('rolUsuario', 'vendedor');
       _usuarioIdActual = id;
       _state = AuthState.registroExitoso;
     } catch (e) {
@@ -53,6 +56,7 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Login unificado: detecta si es vendedor o empresa automáticamente
   Future<void> iniciarSesion({
     required String correoOTelefono,
     required String contrasena,
@@ -60,17 +64,34 @@ class AuthViewModel extends ChangeNotifier {
     _state = AuthState.loading;
     notifyListeners();
     try {
-      final hash    = _repo.hashContrasena(contrasena);
+      final hash = _repo.hashContrasena(contrasena);
+
+      // 1. Busca en usuarios (vendedores)
       final usuario = await _repo.buscarPorCredenciales(correoOTelefono.trim(), hash);
       if (usuario != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setInt('usuarioId', usuario.id!);
+        await prefs.setString('rolUsuario', 'vendedor');
         _usuarioIdActual = usuario.id;
         _state = AuthState.loginExitoso;
-      } else {
-        _errorMsg = 'Correo/celular o contraseña incorrectos. Intenta de nuevo.';
-        _state = AuthState.error;
+        notifyListeners();
+        return;
       }
+
+      // 2. Si no es vendedor, busca en empresas
+      final empresa = await _empresaRepo.login(correoOTelefono.trim(), contrasena);
+      if (empresa != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('empresaId', empresa.id!);
+        await prefs.setString('rolUsuario', 'empresa');
+        _state = AuthState.loginEmpresa;
+        notifyListeners();
+        return;
+      }
+
+      // 3. No encontrado en ninguna tabla
+      _errorMsg = 'Correo/celular o contraseña incorrectos. Intenta de nuevo.';
+      _state = AuthState.error;
     } catch (e) {
       _errorMsg = 'Ocurrió un error. Intenta de nuevo.';
       _state = AuthState.error;
@@ -81,6 +102,8 @@ class AuthViewModel extends ChangeNotifier {
   Future<void> cerrarSesion() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('usuarioId');
+    await prefs.remove('empresaId');
+    await prefs.remove('rolUsuario');
     _usuarioIdActual = null;
     _state = AuthState.idle;
     notifyListeners();

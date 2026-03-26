@@ -92,6 +92,46 @@ class DatabaseHelper {
         duracion TEXT, categoria TEXT, descripcion TEXT
       )
     ''');
+
+    // ─── TABLA EMPRESAS ───────────────────────────────────────────
+await db.execute('''
+  CREATE TABLE empresas (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    razon_social    TEXT NOT NULL,
+    nit             TEXT NOT NULL UNIQUE,
+    sector          TEXT NOT NULL,
+    correo          TEXT NOT NULL UNIQUE,
+    telefono        TEXT,
+    contrasena_hash TEXT NOT NULL,
+    validado        INTEGER NOT NULL DEFAULT 0,
+    fecha_registro  TEXT NOT NULL
+  )
+''');
+
+// ─── TABLA VACANTES PUBLICADAS POR EMPRESA ───────────────────
+await db.execute('''
+  CREATE TABLE vacantes_empresa (
+    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+    empresa_id               INTEGER NOT NULL,
+    titulo                   TEXT NOT NULL,
+    descripcion              TEXT NOT NULL,
+    sector                   TEXT NOT NULL,
+    modalidad                TEXT NOT NULL,
+    jornada                  TEXT NOT NULL,
+    salario_referencial      TEXT,
+    fecha_cierre             TEXT NOT NULL,
+    activa                   INTEGER NOT NULL DEFAULT 1,
+    acepta_experiencia_informal INTEGER NOT NULL DEFAULT 0,
+    acepta_pep_ppt           INTEGER NOT NULL DEFAULT 0,
+    horario_flexible         INTEGER NOT NULL DEFAULT 0,
+    zona_portal              TEXT,
+    incluye_formacion        INTEGER NOT NULL DEFAULT 0,
+    fecha_publicacion        TEXT NOT NULL,
+    FOREIGN KEY (empresa_id) REFERENCES empresas(id)
+  )
+''');
+
+
     await _sembrarVacantes(db);
     await _sembrarFormacion(db);
   }

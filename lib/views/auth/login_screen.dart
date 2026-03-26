@@ -44,12 +44,14 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _onLogin() async {
     if (!_formKey.currentState!.validate()) return;
     final vm = context.read<AuthViewModel>();
+    vm.resetState();
     await vm.iniciarSesion(
       correoOTelefono: _correoCtrl.text,
       contrasena: _passCtrl.text,
     );
     if (!mounted) return;
     if (vm.state == AuthState.loginExitoso) context.go('/home');
+    if (vm.state == AuthState.loginEmpresa) context.go('/empresa/dashboard');
   }
 
   @override
@@ -148,7 +150,6 @@ class _LoginScreenState extends State<LoginScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Correo / celular
                       const Text(
                         AppStrings.correoLabel,
                         style: TextStyle(
@@ -171,7 +172,6 @@ class _LoginScreenState extends State<LoginScreen>
 
                       const SizedBox(height: 20),
 
-                      // Contraseña
                       const Text(
                         AppStrings.passLabel,
                         style: TextStyle(
@@ -206,7 +206,6 @@ class _LoginScreenState extends State<LoginScreen>
 
                       const SizedBox(height: 32),
 
-                      // Botón ingresar
                       ElevatedButton(
                         onPressed: cargando ? null : _onLogin,
                         style: ElevatedButton.styleFrom(
@@ -249,13 +248,24 @@ class _LoginScreenState extends State<LoginScreen>
 
                 const SizedBox(height: 16),
 
-                // Botón ir a registro
+                // ── Botones de registro ───────────────────────────────
                 OutlinedButton(
                   onPressed: () => context.go('/registro'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(52),
                   ),
-                  child: const Text('Crear una cuenta'),
+                  child: const Text('Soy vendedor — Crear cuenta'),
+                ),
+
+                const SizedBox(height: 12),
+
+                OutlinedButton.icon(
+                  onPressed: () => context.go('/empresa/registro'),
+                  icon: const Icon(Icons.business_outlined),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                  ),
+                  label: const Text('Soy empresa — Registrarme'),
                 ),
 
                 const SizedBox(height: 32),
