@@ -6,26 +6,16 @@ import '../database/database_helper.dart';
 class EmpresaRepository {
   final DatabaseHelper _db = DatabaseHelper();
 
-
   String _hashPassword(String password) =>
       sha256.convert(utf8.encode(password)).toString();
 
   Future<int> registrarEmpresa(EmpresaModel empresa) async {
     final db = await _db.database;
-    return db.insert(
-      'empresas',
-      EmpresaModel(
-        id: empresa.id,
-        razonSocial: empresa.razonSocial,
-        nit: empresa.nit,
-        sector: empresa.sector,
-        correo: empresa.correo,
-        telefono: empresa.telefono,
-        contrasenaHash: _hashPassword(empresa.contrasenaHash),
-        validado: empresa.validado,
-        fechaRegistro: empresa.fechaRegistro,
-      ).toMap(),
+    // Hashear la contraseña y usar copyWith para no perder ningún campo
+    final empresaConHash = empresa.copyWith(
+      contrasenaHash: _hashPassword(empresa.contrasenaHash),
     );
+    return db.insert('empresas', empresaConHash.toMap());
   }
 
   Future<EmpresaModel?> login(String correo, String contrasena) async {
@@ -54,14 +44,25 @@ class EmpresaRepository {
 
   Future<bool> nitExiste(String nit) async {
     final db = await _db.database;
-    final result = await db.query('empresas', where: 'nit = ?', whereArgs: [nit]);
+    final result =
+        await db.query('empresas', where: 'nit = ?', whereArgs: [nit]);
     return result.isNotEmpty;
   }
 
   Future<bool> correoExiste(String correo) async {
     final db = await _db.database;
-    final result =
-        await db.query('empresas', where: 'correo = ?', whereArgs: [correo]);
+    final result = await db
+        .query('empresas', where: 'correo = ?', whereArgs: [correo]);
     return result.isNotEmpty;
+  }
+
+  Future<void> actualizarEmpresa(EmpresaModel empresa) async {
+    final db = await _db.database;
+    await db.update(
+      'empresas',
+      empresa.toMap(),
+      where: 'id = ?',
+      whereArgs: [empresa.id],
+    );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../views/auth/login_screen.dart';
 import '../../views/auth/registro_screen.dart';
@@ -10,32 +11,46 @@ import '../../views/legal/politica_privacidad_screen.dart';
 import '../../views/empresas/empresa_registro_screen.dart';
 import '../../views/empresas/empresa_dashboard_screen.dart';
 import '../../views/empresas/publicar_vacante_screen.dart';
+import '../../views/empresas/editar_empresa_screen.dart';
+import '../../views/empresas/mis_vacantes_screen.dart';
 import '../../views/empresas/postulantes_screen.dart';
 import '../../data/models/vacante_empresa_model.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
   routes: [
-    // ── Rutas existentes ───────────────────────────────────────
-    GoRoute(path: '/',                   builder: (_, _) => const SplashScreen()),
-    GoRoute(path: '/login',              builder: (_, _) => const LoginScreen()),
-    GoRoute(path: '/registro',           builder: (_, _) => const RegistroScreen()),
-    GoRoute(path: '/completar-perfil',   builder: (_, _) => const CompletarPerfilScreen()),
-    GoRoute(path: '/onboarding',         builder: (_, _) => const OnboardingScreen()),
-    GoRoute(path: '/home',               builder: (_, _) => const HomeScreen()),
-    GoRoute(path: '/editar-perfil',      builder: (_, _) => const EditarPerfilScreen()),
-    GoRoute(path: '/politica-privacidad',builder: (_, _) => const PoliticaPrivacidadScreen()),
+    // ── Rutas generales ────────────────────────────────────────
+    GoRoute(path: '/',                    builder: (_, __) => const SplashScreen()),
+    GoRoute(path: '/login',               builder: (_, __) => const LoginScreen()),
+    GoRoute(path: '/registro',            builder: (_, __) => const RegistroScreen()),
+    GoRoute(path: '/completar-perfil',    builder: (_, __) => const CompletarPerfilScreen()),
+    GoRoute(path: '/onboarding',          builder: (_, __) => const OnboardingScreen()),
+    GoRoute(path: '/home',                builder: (_, __) => const HomeScreen()),
+    GoRoute(path: '/editar-perfil',       builder: (_, __) => const EditarPerfilScreen()),
+    GoRoute(path: '/politica-privacidad', builder: (_, __) => const PoliticaPrivacidadScreen()),
 
     // ── Módulo empresa ─────────────────────────────────────────
-    GoRoute(path: '/empresa/registro',   builder: (_, _) => const EmpresaRegistroScreen()),
-    GoRoute(path: '/empresa/dashboard',  builder: (_, _) => const EmpresaDashboardScreen()),
-    GoRoute(path: '/empresa/publicar',   builder: (_, _) => const PublicarVacanteScreen()),
+    GoRoute(path: '/empresa/registro',    builder: (_, __) => const EmpresaRegistroScreen()),
+    GoRoute(path: '/empresa/dashboard',   builder: (_, __) => const EmpresaDashboardScreen()),
+    GoRoute(path: '/empresa/editar',      builder: (_, __) => const EditarEmpresaScreen()),
+
+    // ── Publicar vacante — key con timestamp para forzar reset ─
+    GoRoute(
+      path: '/empresa/publicar',
+      builder: (_, state) => PublicarVacanteScreen(
+        key: ValueKey(state.extra ?? 'init'),
+      ),
+    ),
+
+    // ── Confirmación post-publicación ──────────────────────────
     GoRoute(
       path: '/empresa/publicar-confirmacion',
       builder: (_, state) => VacantePublicadaScreen(
         titulo: state.extra as String,
       ),
     ),
+
+    // ── Postulantes ────────────────────────────────────────────
     GoRoute(
       path: '/empresa/postulantes',
       builder: (_, state) {

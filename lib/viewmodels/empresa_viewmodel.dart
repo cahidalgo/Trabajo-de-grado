@@ -77,16 +77,7 @@ class EmpresaViewModel extends ChangeNotifier {
 
     final id = await _repo.registrarEmpresa(empresa);
 
-    empresaActual = EmpresaModel(
-      id: id,
-      razonSocial: razonSocial,
-      nit: nit,
-      sector: sector,
-      correo: correo,
-      telefono: telefono,
-      contrasenaHash: empresa.contrasenaHash,
-      fechaRegistro: empresa.fechaRegistro,
-    );
+    empresaActual = empresa.copyWith(id: id);
     await _persistirSesion(id);
 
     cargando = false;
@@ -113,6 +104,40 @@ class EmpresaViewModel extends ChangeNotifier {
     cargando = false;
     notifyListeners();
     return true;
+  }
+
+  /// Actualiza los datos editables de la empresa
+  Future<bool> actualizarPerfil({
+    required String razonSocial,
+    required String telefono,
+    required String descripcion,
+  }) async {
+    if (empresaActual == null) return false;
+    cargando = true;
+    errorMensaje = null;
+    notifyListeners();
+
+    final actualizada = empresaActual!.copyWith(
+      razonSocial: razonSocial,
+      telefono: telefono.trim().isEmpty ? null : telefono.trim(),
+      descripcion: descripcion.trim().isEmpty ? null : descripcion.trim(),
+    );
+
+    await _repo.actualizarEmpresa(actualizada);
+    empresaActual = actualizada;
+
+    cargando = false;
+    notifyListeners();
+    return true;
+  }
+
+  /// Guarda ruta de foto de perfil de la empresa
+  Future<void> actualizarFoto(String rutaFoto) async {
+    if (empresaActual == null) return;
+    final actualizada = empresaActual!.copyWith(fotoPerfil: rutaFoto);
+    await _repo.actualizarEmpresa(actualizada);
+    empresaActual = actualizada;
+    notifyListeners();
   }
 
   Future<void> cerrarSesion() async {

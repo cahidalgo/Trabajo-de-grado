@@ -5,7 +5,6 @@ import '../../viewmodels/empresa_viewmodel.dart';
 import '../../viewmodels/vacante_empresa_viewmodel.dart';
 import '../../data/models/vacante_empresa_model.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/widgets/app_ui.dart';
 import '../../core/widgets/etiqueta_inclusion_chip.dart';
 
 class PublicarVacanteScreen extends StatefulWidget {
@@ -32,14 +31,6 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
   bool _aceptaPepPpt = false;
   bool _horarioFlexible = false;
   bool _incluyeFormacion = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<EmpresaViewModel>().restaurarSesion();
-    });
-  }
 
   final _sectores = [
     'Ventas y comercio', 'Logística', 'Gastronomía',
@@ -81,15 +72,8 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
       return;
     }
 
-    final empresaId = context.read<EmpresaViewModel>().empresaActual?.id;
-    if (empresaId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No encontramos la sesión de empresa.'),
-        ),
-      );
-      return;
-    }
+    final empresaId =
+        context.read<EmpresaViewModel>().empresaActual!.id!;
 
     final vacante = VacanteEmpresaModel(
       empresaId: empresaId,
@@ -123,33 +107,17 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final empresaVm = context.watch<EmpresaViewModel>();
     final vm = context.watch<VacanteEmpresaViewModel>();
 
-    if (empresaVm.cargando && empresaVm.empresaActual == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (empresaVm.empresaActual == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Publicar vacante')),
-        body: AppEmptyState(
-          icon: Icons.business_center_outlined,
-          title: 'No hay una empresa cargada',
-          description:
-              'Vuelve a iniciar sesión para publicar vacantes desde tu panel empresarial.',
-          action: ElevatedButton(
-            onPressed: () => context.go('/login'),
-            child: const Text('Ir a iniciar sesión'),
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Publicar vacante')),
+      appBar: AppBar(
+        title: const Text('Publicar vacante'),
+        // ── Botón retroceder ──────────────────────────────────
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => context.go('/empresa/dashboard'),
+        ),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Form(
@@ -157,7 +125,6 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Encabezado ───────────────────────────────────────
               const Text(
                 'Información de la vacante',
                 style: TextStyle(
@@ -165,7 +132,6 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Título
               TextFormField(
                 controller: _tituloCtrl,
                 decoration:
@@ -175,7 +141,6 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Descripción
               TextFormField(
                 controller: _descripcionCtrl,
                 maxLines: 3,
@@ -186,11 +151,9 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Sector
               DropdownButtonFormField<String>(
-                initialValue: _sector,
-                decoration:
-                    const InputDecoration(labelText: 'Sector'),
+                value: _sector,
+                decoration: const InputDecoration(labelText: 'Sector'),
                 items: _sectores
                     .map((s) =>
                         DropdownMenuItem(value: s, child: Text(s)))
@@ -199,9 +162,8 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Modalidad — separado para evitar overflow
               DropdownButtonFormField<String>(
-                initialValue: _modalidad,
+                value: _modalidad,
                 decoration:
                     const InputDecoration(labelText: 'Modalidad'),
                 items: _modalidades
@@ -212,9 +174,8 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Jornada — separado para evitar overflow
               DropdownButtonFormField<String>(
-                initialValue: _jornada,
+                value: _jornada,
                 decoration:
                     const InputDecoration(labelText: 'Jornada'),
                 items: _jornadas
@@ -225,7 +186,6 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Salario
               TextFormField(
                 controller: _salarioCtrl,
                 decoration: const InputDecoration(
@@ -235,9 +195,8 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Portal
               DropdownButtonFormField<String>(
-                initialValue: _zonaPortal,
+                value: _zonaPortal,
                 decoration: const InputDecoration(
                     labelText: 'Portal/zona cercana (opcional)'),
                 items: _portales
@@ -248,7 +207,6 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Fecha de cierre
               InkWell(
                 onTap: _seleccionarFecha,
                 borderRadius: BorderRadius.circular(10),
@@ -262,7 +220,8 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
                   child: Row(
                     children: [
                       const Icon(Icons.calendar_today,
-                          size: 20, color: AppColors.textSecondary),
+                          size: 20,
+                          color: AppColors.textSecondary),
                       const SizedBox(width: 12),
                       Text(
                         _fechaCierre == null
@@ -280,7 +239,6 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
                 ),
               ),
 
-              // ── Etiquetas de inclusión ───────────────────────────
               const Divider(height: 32),
               const Text(
                 'Etiquetas de inclusión',
@@ -333,7 +291,6 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
 
               const SizedBox(height: 28),
 
-              // Error
               if (vm.errorMensaje != null)
                 Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -360,7 +317,6 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
                   ),
                 ),
 
-              // Botón publicar
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -403,7 +359,6 @@ class VacantePublicadaScreen extends StatelessWidget {
             children: [
               const SizedBox(height: 40),
 
-              // ── Ícono éxito ────────────────────────────────────
               Center(
                 child: Container(
                   width: 80,
@@ -446,7 +401,6 @@ class VacantePublicadaScreen extends StatelessWidget {
 
               const SizedBox(height: 28),
 
-              // ── Banner validación pendiente ────────────────────
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -493,7 +447,6 @@ class VacantePublicadaScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // ── Info mis vacantes ──────────────────────────────
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -523,9 +476,11 @@ class VacantePublicadaScreen extends StatelessWidget {
 
               const SizedBox(height: 32),
 
-              // ── Botones con go_router ──────────────────────────
               ElevatedButton(
-                onPressed: () => context.go('/empresa/publicar'),
+                onPressed: () => context.go(
+                  '/empresa/publicar',
+                  extra: DateTime.now().millisecondsSinceEpoch.toString(),
+                ),
                 child: const Text('Publicar otra vacante'),
               ),
               const SizedBox(height: 12),
