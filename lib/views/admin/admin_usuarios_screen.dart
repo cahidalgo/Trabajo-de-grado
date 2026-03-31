@@ -12,38 +12,63 @@ class AdminUsuariosScreen extends StatelessWidget {
     final usuarios = vm.usuarios;
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('Usuarios (${usuarios.length})'),
+        title: Text(
+          'Usuarios (${usuarios.length})',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         automaticallyImplyLeading: false,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: AppColors.border),
+        ),
       ),
       body: vm.cargando
           ? const Center(child: CircularProgressIndicator())
           : usuarios.isEmpty
-              ? const Center(
+              ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.people_outline,
-                          size: 48, color: AppColors.textSecondary),
-                      SizedBox(height: 12),
-                      Text('Aún no hay usuarios registrados',
-                          style: TextStyle(color: AppColors.textSecondary)),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: AppColors.border.withOpacity(0.5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.people_outline,
+                            size: 40, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Aún no hay usuarios registrados',
+                        style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500),
+                      ),
                     ],
                   ),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: usuarios.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (_, i) => _UsuarioTile(usuario: usuarios[i]),
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: 10),
+                  itemBuilder: (_, i) =>
+                      _UsuarioCard(usuario: usuarios[i]),
                 ),
     );
   }
 }
 
-class _UsuarioTile extends StatelessWidget {
+class _UsuarioCard extends StatelessWidget {
   final Map<String, dynamic> usuario;
-  const _UsuarioTile({required this.usuario});
+  const _UsuarioCard({required this.usuario});
 
   @override
   Widget build(BuildContext context) {
@@ -52,49 +77,161 @@ class _UsuarioTile extends StatelessWidget {
             ? usuario['nombreCompleto'] as String
             : 'Sin nombre';
     final contacto = usuario['correoOTelefono'] as String? ?? '';
-    final fecha = (usuario['fechaRegistro'] as String? ?? '').length >= 10
-        ? (usuario['fechaRegistro'] as String).substring(0, 10)
-        : '';
+    final raw = usuario['fechaRegistro'] as String? ?? '';
+    final fecha =
+        raw.length >= 10 ? raw.substring(0, 10) : raw;
     final perfilCompleto = (usuario['perfilCompleto'] as int?) == 1;
+    final inicial =
+        nombre.isNotEmpty ? nombre[0].toUpperCase() : '?';
 
-    return ListTile(
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      leading: CircleAvatar(
-        radius: 22,
-        backgroundColor: AppColors.primary.withOpacity(0.12),
-        child: Text(
-          nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
-          style: const TextStyle(
-              color: AppColors.primary, fontWeight: FontWeight.bold),
-        ),
-      ),
-      title: Text(nombre,
-          style:
-              const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(contacto,
-              style: const TextStyle(
-                  fontSize: 12, color: AppColors.textSecondary)),
-          if (fecha.isNotEmpty)
-            Text('Registrado: $fecha',
-                style: const TextStyle(
-                    fontSize: 11, color: AppColors.textSecondary)),
+    // Color del avatar según inicial
+    final avatarColors = [
+      AppColors.primary,
+      const Color(0xFF2E7D32),
+      const Color(0xFF6A1B9A),
+      const Color(0xFFBF360C),
+      const Color(0xFF00695C),
+    ];
+    final colorIdx = nombre.isEmpty
+        ? 0
+        : nombre.codeUnitAt(0) % avatarColors.length;
+    final avatarColor = avatarColors[colorIdx];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
-      trailing: Tooltip(
-        message: perfilCompleto ? 'Perfil completo' : 'Perfil incompleto',
-        child: Icon(
-          perfilCompleto
-              ? Icons.check_circle_outline
-              : Icons.radio_button_unchecked,
-          color: perfilCompleto
-              ? const Color(0xFF2E7D32)
-              : AppColors.textSecondary,
-          size: 20,
-        ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Avatar ─────────────────────────────────────────
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: avatarColor.withOpacity(0.13),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Center(
+              child: Text(
+                inicial,
+                style: TextStyle(
+                  color: avatarColor,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+
+          // ── Info ───────────────────────────────────────────
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        nombre,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    _PerfilBadge(completo: perfilCompleto),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    const Icon(Icons.alternate_email,
+                        size: 13, color: AppColors.textSecondary),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        contacto,
+                        style: const TextStyle(
+                            fontSize: 13, color: AppColors.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                if (fecha.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today_outlined,
+                          size: 12, color: AppColors.textSecondary),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Registrado el $fecha',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PerfilBadge extends StatelessWidget {
+  final bool completo;
+  const _PerfilBadge({required this.completo});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: completo
+            ? const Color(0xFF2E7D32).withOpacity(0.1)
+            : AppColors.border,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            completo ? Icons.check_circle : Icons.person_outline,
+            size: 12,
+            color: completo
+                ? const Color(0xFF2E7D32)
+                : AppColors.textSecondary,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            completo ? 'Perfil completo' : 'Incompleto',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: completo
+                  ? const Color(0xFF2E7D32)
+                  : AppColors.textSecondary,
+            ),
+          ),
+        ],
       ),
     );
   }

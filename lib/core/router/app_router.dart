@@ -10,9 +10,8 @@ import '../../views/legal/politica_privacidad_screen.dart';
 import '../../views/empresas/empresa_registro_screen.dart';
 import '../../views/empresas/empresa_dashboard_screen.dart';
 import '../../views/empresas/publicar_vacante_screen.dart';
-import '../../views/empresas/mis_vacantes_screen.dart';
 import '../../views/empresas/postulantes_screen.dart';
-import '../../views/admin/admin_shell_screen.dart'; // ✅ nuevo
+import '../../views/admin/admin_shell_screen.dart';
 import '../../data/models/vacante_empresa_model.dart';
 
 final appRouter = GoRouter(

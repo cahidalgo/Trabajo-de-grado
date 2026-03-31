@@ -31,40 +31,54 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       child: Consumer<AdminViewModel>(
         builder: (context, vm, _) => Scaffold(
           body: IndexedStack(index: _currentIndex, children: _tabs),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: (i) =>
-                setState(() => _currentIndex = i),
-            destinations: [
-              const NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard),
-                label: 'Inicio',
-              ),
-              NavigationDestination(
-                icon: Badge(
-                  isLabelVisible: vm.empresasPendientes > 0,
-                  label: Text('${vm.empresasPendientes}'),
-                  child: const Icon(Icons.business_outlined),
+          bottomNavigationBar: Container(
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
+            child: NavigationBar(
+              selectedIndex: _currentIndex,
+              onDestinationSelected: (i) =>
+                  setState(() => _currentIndex = i),
+              backgroundColor: Colors.white,
+              elevation: 0,
+              indicatorColor: AppColors.primaryLight,
+              labelBehavior:
+                  NavigationDestinationLabelBehavior.alwaysShow,
+              destinations: [
+                const NavigationDestination(
+                  icon: Icon(Icons.dashboard_outlined),
+                  selectedIcon:
+                      Icon(Icons.dashboard, color: AppColors.primary),
+                  label: 'Inicio',
                 ),
-                selectedIcon: Badge(
-                  isLabelVisible: vm.empresasPendientes > 0,
-                  label: Text('${vm.empresasPendientes}'),
-                  child: const Icon(Icons.business),
+                NavigationDestination(
+                  icon: Badge(
+                    isLabelVisible: vm.empresasPendientes > 0,
+                    label: Text('${vm.empresasPendientes}'),
+                    child: const Icon(Icons.business_outlined),
+                  ),
+                  selectedIcon: Badge(
+                    isLabelVisible: vm.empresasPendientes > 0,
+                    label: Text('${vm.empresasPendientes}'),
+                    child: const Icon(Icons.business,
+                        color: AppColors.primary),
+                  ),
+                  label: 'Empresas',
                 ),
-                label: 'Empresas',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.people_outline),
-                selectedIcon: Icon(Icons.people),
-                label: 'Usuarios',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.work_outline),
-                selectedIcon: Icon(Icons.work),
-                label: 'Vacantes',
-              ),
-            ],
+                const NavigationDestination(
+                  icon: Icon(Icons.people_outline),
+                  selectedIcon:
+                      Icon(Icons.people, color: AppColors.primary),
+                  label: 'Usuarios',
+                ),
+                const NavigationDestination(
+                  icon: Icon(Icons.work_outline),
+                  selectedIcon:
+                      Icon(Icons.work, color: AppColors.primary),
+                  label: 'Vacantes',
+                ),
+              ],
+            ),
           ),
         ),
       ),

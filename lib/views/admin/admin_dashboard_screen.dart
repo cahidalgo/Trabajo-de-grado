@@ -14,115 +14,242 @@ class AdminDashboardScreen extends StatelessWidget {
     final vm = context.watch<AdminViewModel>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Administración'),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_outlined),
-            tooltip: 'Cerrar sesión',
-            onPressed: () async {
-              await context.read<AuthViewModel>().cerrarSesion();
-              if (context.mounted) context.go('/login');
-            },
-          ),
-        ],
-      ),
+      backgroundColor: AppColors.background,
       body: RefreshIndicator(
         onRefresh: vm.cargarTodo,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text(
-              'Resumen general',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Desliza hacia abajo para actualizar',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 20),
-
-            // ── KPI Grid ─────────────────────────────────────────
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.45,
-              children: [
-                _KpiCard(
-                  label: 'Usuarios',
-                  valor: vm.totalUsuarios,
-                  icono: Icons.people_outline,
-                  color: AppColors.primary,
-                ),
-                _KpiCard(
-                  label: 'Empresas',
-                  valor: vm.totalEmpresas,
-                  icono: Icons.business_outlined,
-                  color: const Color(0xFFE65100),
-                  subtitulo: vm.empresasPendientes > 0
-                      ? '${vm.empresasPendientes} pendiente(s)'
-                      : 'Todas validadas',
-                  subtituloColor: vm.empresasPendientes > 0
-                      ? const Color(0xFFE65100)
-                      : const Color(0xFF2E7D32),
-                ),
-                _KpiCard(
-                  label: 'Vacantes activas',
-                  valor: vm.vacantesActivas,
-                  icono: Icons.work_outline,
-                  color: const Color(0xFF2E7D32),
-                  subtitulo: 'de ${vm.totalVacantes} publicadas',
-                ),
-                _KpiCard(
-                  label: 'Postulaciones',
-                  valor: vm.totalPostulaciones,
-                  icono: Icons.assignment_outlined,
-                  color: const Color(0xFF1565C0),
-                ),
-              ],
-            ),
-            const SizedBox(height: 28),
-
-            // ── Empresas pendientes ──────────────────────────────
-            if (vm.empresasPendientes > 0) ...[
-              Row(
-                children: const [
-                  Icon(Icons.warning_amber_rounded,
-                      color: Color(0xFFE65100), size: 18),
-                  SizedBox(width: 8),
-                  Text(
-                    'Pendientes de validación',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFE65100)),
+        child: CustomScrollView(
+          slivers: [
+            // ── Header ────────────────────────────────────────────
+            SliverAppBar(
+              expandedHeight: 140,
+              pinned: true,
+              automaticallyImplyLeading: false,
+              backgroundColor: AppColors.primary,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
+                    ),
                   ),
-                ],
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 16, 16, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.admin_panel_settings,
+                                    color: Colors.white, size: 22),
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Panel de Administración',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: -0.3,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Vendedores TM',
+                                      style: TextStyle(
+                                          color: Colors.white70, fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.logout_outlined,
+                                    color: Colors.white70),
+                                tooltip: 'Cerrar sesión',
+                                onPressed: () async {
+                                  await context
+                                      .read<AuthViewModel>()
+                                      .cerrarSesion();
+                                  if (context.mounted) context.go('/login');
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 12),
-              ...vm.empresas
-                  .where((e) => !e.validado)
-                  .take(3)
-                  .map((e) => _EmpresaPendienteTile(empresa: e)),
-              if (vm.empresas.where((e) => !e.validado).length > 3)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    'Ir a Empresas para ver todas →',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w500),
-                  ),
+            ),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Hint refresh ──────────────────────────────
+                    Row(
+                      children: [
+                        const Text(
+                          'Resumen general',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Desliza para actualizar',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary
+                                  .withOpacity(0.7)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── KPI Grid ──────────────────────────────────
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 14,
+                      mainAxisSpacing: 14,
+                      childAspectRatio: 1.35,
+                      children: [
+                        _KpiCard(
+                          label: 'Usuarios',
+                          valor: vm.totalUsuarios,
+                          icono: Icons.people_rounded,
+                          gradientColors: const [
+                            Color(0xFF1565C0),
+                            Color(0xFF1976D2)
+                          ],
+                        ),
+                        _KpiCard(
+                          label: 'Empresas',
+                          valor: vm.totalEmpresas,
+                          icono: Icons.business_rounded,
+                          gradientColors: const [
+                            Color(0xFFBF360C),
+                            Color(0xFFE64A19)
+                          ],
+                          badge: vm.empresasPendientes > 0
+                              ? '${vm.empresasPendientes} pendiente(s)'
+                              : null,
+                          badgeGreen: vm.empresasPendientes == 0,
+                          badgeLabel: vm.empresasPendientes == 0
+                              ? 'Al día'
+                              : null,
+                        ),
+                        _KpiCard(
+                          label: 'Vacantes activas',
+                          valor: vm.vacantesActivas,
+                          icono: Icons.work_rounded,
+                          gradientColors: const [
+                            Color(0xFF1B5E20),
+                            Color(0xFF2E7D32)
+                          ],
+                          badge: 'de ${vm.totalVacantes} publicadas',
+                          badgeGreen: true,
+                        ),
+                        _KpiCard(
+                          label: 'Postulaciones',
+                          valor: vm.totalPostulaciones,
+                          icono: Icons.assignment_rounded,
+                          gradientColors: const [
+                            Color(0xFF4A148C),
+                            Color(0xFF6A1B9A)
+                          ],
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // ── Empresas pendientes ────────────────────────
+                    if (vm.empresasPendientes > 0) ...[
+                      _SectionHeader(
+                        icono: Icons.warning_amber_rounded,
+                        titulo: 'Pendientes de validación',
+                        color: const Color(0xFFE65100),
+                      ),
+                      const SizedBox(height: 12),
+                      ...vm.empresas
+                          .where((e) => !e.validado)
+                          .take(3)
+                          .map((e) => _EmpresaPendienteTile(empresa: e)),
+                      if (vm.empresas.where((e) => !e.validado).length > 3)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8, bottom: 4),
+                          child: Row(
+                            children: [
+                              Icon(Icons.arrow_forward,
+                                  size: 14, color: AppColors.primary),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Ver todas en la pestaña Empresas',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // ── Stats rápidas ──────────────────────────────
+                    _SectionHeader(
+                      icono: Icons.bar_chart_rounded,
+                      titulo: 'Actividad global',
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(height: 12),
+                    _StatRow(
+                      label: 'Vacantes inactivas',
+                      valor: '${vm.totalVacantes - vm.vacantesActivas}',
+                      icono: Icons.pause_circle_outline,
+                      color: AppColors.textSecondary,
+                    ),
+                    _StatRow(
+                      label: 'Empresas validadas',
+                      valor:
+                          '${vm.totalEmpresas - vm.empresasPendientes}',
+                      icono: Icons.verified_outlined,
+                      color: AppColors.success,
+                    ),
+                    _StatRow(
+                      label: 'Postulaciones totales',
+                      valor: '${vm.totalPostulaciones}',
+                      icono: Icons.send_outlined,
+                      color: const Color(0xFF6A1B9A),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
                 ),
-            ],
+              ),
+            ),
           ],
         ),
       ),
@@ -135,55 +262,102 @@ class _KpiCard extends StatelessWidget {
   final String label;
   final int valor;
   final IconData icono;
-  final Color color;
-  final String? subtitulo;
-  final Color? subtituloColor;
+  final List<Color> gradientColors;
+  final String? badge;
+  final String? badgeLabel;
+  final bool badgeGreen;
 
   const _KpiCard({
     required this.label,
     required this.valor,
     required this.icono,
-    required this.color,
-    this.subtitulo,
-    this.subtituloColor,
+    required this.gradientColors,
+    this.badge,
+    this.badgeLabel,
+    this.badgeGreen = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.07),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.2)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradientColors,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: gradientColors.last.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icono, color: color, size: 22),
+          Icon(icono, color: Colors.white.withOpacity(0.9), size: 26),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 '$valor',
-                style: TextStyle(
-                  fontSize: 26,
+                style: const TextStyle(
+                  fontSize: 34,
                   fontWeight: FontWeight.bold,
-                  color: color,
+                  color: Colors.white,
+                  height: 1,
                 ),
               ),
-              Text(label,
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary)),
-              if (subtitulo != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  subtitulo!,
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: subtituloColor ?? AppColors.textSecondary,
-                      fontWeight: FontWeight.w500),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withOpacity(0.8),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (badge != null) ...[
+                const SizedBox(height: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: badgeGreen
+                        ? Colors.white.withOpacity(0.25)
+                        : Colors.orange.withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    badge!,
+                    style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+              if (badgeLabel != null) ...[
+                const SizedBox(height: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    badgeLabel!,
+                    style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600),
+                  ),
                 ),
               ],
             ],
@@ -194,7 +368,97 @@ class _KpiCard extends StatelessWidget {
   }
 }
 
-// ── Empresa pendiente (tile compacto) ─────────────────────────
+// ── Section header ────────────────────────────────────────────
+class _SectionHeader extends StatelessWidget {
+  final IconData icono;
+  final String titulo;
+  final Color color;
+  const _SectionHeader(
+      {required this.icono, required this.titulo, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icono, size: 16, color: color),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          titulo,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Stat row ──────────────────────────────────────────────────
+class _StatRow extends StatelessWidget {
+  final String label;
+  final String valor;
+  final IconData icono;
+  final Color color;
+  const _StatRow(
+      {required this.label,
+      required this.valor,
+      required this.icono,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icono, size: 16, color: color),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w500),
+            ),
+          ),
+          Text(
+            valor,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Empresa pendiente ─────────────────────────────────────────
 class _EmpresaPendienteTile extends StatelessWidget {
   final EmpresaModel empresa;
   const _EmpresaPendienteTile({required this.empresa});
@@ -202,36 +466,62 @@ class _EmpresaPendienteTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF3E0),
-        borderRadius: BorderRadius.circular(10),
+        color: const Color(0xFFFFF8F0),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFFFCC80)),
       ),
       child: Row(
         children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE65100).withOpacity(0.12),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: const Icon(Icons.business_outlined,
+                color: Color(0xFFE65100), size: 20),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(empresa.razonSocial,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 13)),
-                Text(empresa.sector,
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textSecondary)),
+                Text(
+                  empresa.razonSocial,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${empresa.sector} · ${empresa.correo}',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
               ],
             ),
           ),
-          TextButton(
+          const SizedBox(width: 8),
+          ElevatedButton(
             onPressed: () =>
                 context.read<AdminViewModel>().validarEmpresa(empresa.id!),
-            style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF2E7D32),
-                padding: const EdgeInsets.symmetric(horizontal: 10)),
-            child: const Text('Validar',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E7D32),
+              foregroundColor: Colors.white,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              textStyle: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.bold),
+              elevation: 0,
+            ),
+            child: const Text('Validar'),
           ),
         ],
       ),
