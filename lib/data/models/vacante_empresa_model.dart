@@ -15,6 +15,8 @@ class VacanteEmpresaModel {
   final String? zonaPortal;
   final bool incluyeFormacion;
   final String fechaPublicacion;
+  // ID espejo en la tabla `vacantes` (se asigna tras el dual-write)
+  final int? vacanteId;
 
   VacanteEmpresaModel({
     this.id,
@@ -33,26 +35,32 @@ class VacanteEmpresaModel {
     this.zonaPortal,
     this.incluyeFormacion = false,
     required this.fechaPublicacion,
+    this.vacanteId,
   });
 
-  Map<String, dynamic> toMap() => {
-    'id': id,
-    'empresa_id': empresaId,
-    'titulo': titulo,
-    'descripcion': descripcion,
-    'sector': sector,
-    'modalidad': modalidad,
-    'jornada': jornada,
-    'salario_referencial': salarioReferencial,
-    'fecha_cierre': fechaCierre,
-    'activa': activa ? 1 : 0,
-    'acepta_experiencia_informal': aceptaExperienciaInformal ? 1 : 0,
-    'acepta_pep_ppt': aceptaPepPpt ? 1 : 0,
-    'horario_flexible': horarioFlexible ? 1 : 0,
-    'zona_portal': zonaPortal,
-    'incluye_formacion': incluyeFormacion ? 1 : 0,
-    'fecha_publicacion': fechaPublicacion,
-  };
+  Map<String, dynamic> toMap() {
+    final map = <String, dynamic>{
+      'empresa_id': empresaId,
+      'titulo': titulo,
+      'descripcion': descripcion,
+      'sector': sector,
+      'modalidad': modalidad,
+      'jornada': jornada,
+      'salario_referencial': salarioReferencial,
+      'fecha_cierre': fechaCierre,
+      'activa': activa ? 1 : 0,
+      'acepta_experiencia_informal': aceptaExperienciaInformal ? 1 : 0,
+      'acepta_pep_ppt': aceptaPepPpt ? 1 : 0,
+      'horario_flexible': horarioFlexible ? 1 : 0,
+      'zona_portal': zonaPortal,
+      'incluye_formacion': incluyeFormacion ? 1 : 0,
+      'fecha_publicacion': fechaPublicacion,
+      'vacante_id': vacanteId,
+    };
+    // No incluir `id` al insertar (AUTOINCREMENT lo genera la BD)
+    if (id != null) map['id'] = id;
+    return map;
+  }
 
   factory VacanteEmpresaModel.fromMap(Map<String, dynamic> map) =>
       VacanteEmpresaModel(
@@ -72,5 +80,6 @@ class VacanteEmpresaModel {
         zonaPortal: map['zona_portal'],
         incluyeFormacion: map['incluye_formacion'] == 1,
         fechaPublicacion: map['fecha_publicacion'],
+        vacanteId: map['vacante_id'],
       );
 }

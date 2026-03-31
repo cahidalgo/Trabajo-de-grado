@@ -18,7 +18,7 @@ class DatabaseHelper {
     final path = join(dbPath, 'vendedores_tm.db');
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -31,6 +31,11 @@ class DatabaseHelper {
           'ALTER TABLE empresas ADD COLUMN descripcion TEXT');
       await db.execute(
           'ALTER TABLE empresas ADD COLUMN foto_perfil TEXT');
+    }
+    if (oldVersion < 3) {
+      // Vincula cada vacante de empresa con su espejo en la tabla vacantes
+      await db.execute(
+          'ALTER TABLE vacantes_empresa ADD COLUMN vacante_id INTEGER');
     }
   }
 
@@ -171,6 +176,7 @@ class DatabaseHelper {
         zona_portal TEXT,
         incluye_formacion INTEGER NOT NULL DEFAULT 0,
         fecha_publicacion TEXT NOT NULL,
+        vacante_id INTEGER,
         FOREIGN KEY (empresa_id) REFERENCES empresas(id)
       )
     ''');

@@ -70,7 +70,7 @@ class EmpresaRepository {
     final db = await _db.database;
     await db.update(
       'empresas',
-      {'contrasena': hashContrasena},
+      {'contrasena_hash': hashContrasena},   // ✅ columna correcta
       where: 'id = ?',
       whereArgs: [id],
     );

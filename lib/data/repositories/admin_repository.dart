@@ -75,11 +75,34 @@ class AdminRepository {
     final db = await _db.database;
     await db.update(
         'vacantes_empresa', {'activa': 0}, where: 'id = ?', whereArgs: [id]);
+    // ✅ Sincronizar espejo en vacantes para que desaparezca de la vista usuario
+    final vacanteId = await _vacanteEspejoId(db, id);
+    if (vacanteId != null) {
+      await db.update(
+          'vacantes', {'activa': 0}, where: 'id = ?', whereArgs: [vacanteId]);
+    }
   }
 
   Future<void> activarVacante(int id) async {
     final db = await _db.database;
     await db.update(
         'vacantes_empresa', {'activa': 1}, where: 'id = ?', whereArgs: [id]);
+    // ✅ Sincronizar espejo en vacantes para que vuelva a aparecer
+    final vacanteId = await _vacanteEspejoId(db, id);
+    if (vacanteId != null) {
+      await db.update(
+          'vacantes', {'activa': 1}, where: 'id = ?', whereArgs: [vacanteId]);
+    }
+  }
+
+  Future<int?> _vacanteEspejoId(Database db, int vacanteEmpresaId) async {
+    final result = await db.query(
+      'vacantes_empresa',
+      columns: ['vacante_id'],
+      where: 'id = ?',
+      whereArgs: [vacanteEmpresaId],
+    );
+    if (result.isEmpty) return null;
+    return result.first['vacante_id'] as int?;
   }
 }
