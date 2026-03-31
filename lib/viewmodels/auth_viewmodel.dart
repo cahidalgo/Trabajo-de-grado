@@ -4,7 +4,19 @@ import '../data/repositories/usuario_repository.dart';
 import '../data/repositories/empresa_repository.dart';
 import '../data/models/usuario.dart';
 
-enum AuthState { idle, loading, registroExitoso, loginExitoso, loginEmpresa, error }
+enum AuthState {
+  idle,
+  loading,
+  registroExitoso,
+  loginExitoso,
+  loginEmpresa,
+  loginAdmin, // ✅ nuevo
+  error,
+}
+
+// ── Credenciales admin (hardcoded para MVP) ────────────────────
+const _kAdminCorreo = 'admin@vendedorestm.com';
+const _kAdminContrasena = 'Admin123*';
 
 class AuthViewModel extends ChangeNotifier {
   final _repo = UsuarioRepository();
@@ -50,14 +62,13 @@ class AuthViewModel extends ChangeNotifier {
       await prefs.setString('rolUsuario', 'vendedor');
       _usuarioIdActual = id;
       _state = AuthState.registroExitoso;
-    } catch (e) {
+    } catch (_) {
       _errorMsg = 'Ocurrió un error. Intenta de nuevo.';
       _state = AuthState.error;
     }
     notifyListeners();
   }
 
-  // Login unificado: detecta si es vendedor o empresa automáticamente
   Future<void> iniciarSesion({
     required String correoOTelefono,
     required String contrasena,
@@ -67,8 +78,9 @@ class AuthViewModel extends ChangeNotifier {
     try {
       final hash = _repo.hashContrasena(contrasena);
 
-      // 1. Busca en usuarios (vendedores)
-      final usuario = await _repo.buscarPorCredenciales(correoOTelefono.trim(), hash);
+      // 1. Vendedor
+      final usuario = await _repo.buscarPorCredenciales(
+          correoOTelefono.trim(), hash);
       if (usuario != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('empresaId');
@@ -80,8 +92,9 @@ class AuthViewModel extends ChangeNotifier {
         return;
       }
 
-      // 2. Si no es vendedor, busca en empresas
-      final empresa = await _empresaRepo.login(correoOTelefono.trim(), contrasena);
+      // 2. Empresa
+      final empresa =
+          await _empresaRepo.login(correoOTelefono.trim(), contrasena);
       if (empresa != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('usuarioId');
@@ -92,10 +105,23 @@ class AuthViewModel extends ChangeNotifier {
         return;
       }
 
-      // 3. No encontrado en ninguna tabla
-      _errorMsg = 'Correo/celular o contraseña incorrectos. Intenta de nuevo.';
+      // 3. ✅ Administrador (credenciales fijas)
+      if (correoOTelefono.trim() == _kAdminCorreo &&
+          contrasena == _kAdminContrasena) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('usuarioId');
+        await prefs.remove('empresaId');
+        await prefs.setString('rolUsuario', 'admin');
+        _state = AuthState.loginAdmin;
+        notifyListeners();
+        return;
+      }
+
+      // 4. No encontrado
+      _errorMsg =
+          'Correo/celular o contraseña incorrectos. Intenta de nuevo.';
       _state = AuthState.error;
-    } catch (e) {
+    } catch (_) {
       _errorMsg = 'Ocurrió un error. Intenta de nuevo.';
       _state = AuthState.error;
     }

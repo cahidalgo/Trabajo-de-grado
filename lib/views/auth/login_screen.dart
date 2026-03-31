@@ -52,6 +52,7 @@ class _LoginScreenState extends State<LoginScreen>
     if (!mounted) return;
     if (vm.state == AuthState.loginExitoso) context.go('/home');
     if (vm.state == AuthState.loginEmpresa) context.go('/empresa/dashboard');
+    if (vm.state == AuthState.loginAdmin) context.go('/admin'); // ✅ nuevo
   }
 
   @override
