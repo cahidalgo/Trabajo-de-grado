@@ -26,7 +26,8 @@ class UsuarioRepository {
     return result.isNotEmpty;
   }
 
-  Future<Usuario?> buscarPorCredenciales(String correoOTelefono, String contrasenaHash) async {
+  Future<Usuario?> buscarPorCredenciales(
+      String correoOTelefono, String contrasenaHash) async {
     final db = await _db.database;
     final result = await db.query(
       'usuarios',
@@ -37,15 +38,14 @@ class UsuarioRepository {
     return Usuario.fromMap(result.first);
   }
 
-  // Obtener usuario por ID (para mostrar en perfil)
   Future<Usuario?> obtenerPorId(int id) async {
     final db = await _db.database;
-    final result = await db.query('usuarios', where: 'id = ?', whereArgs: [id]);
+    final result =
+        await db.query('usuarios', where: 'id = ?', whereArgs: [id]);
     if (result.isEmpty) return null;
     return Usuario.fromMap(result.first);
   }
 
-  // Actualizar nombre completo
   Future<void> actualizarNombre(int id, String nuevoNombre) async {
     final db = await _db.database;
     await db.update(
@@ -64,4 +64,16 @@ class UsuarioRepository {
       'versionPolitica': '1.0',
     });
   }
+
+  // ✅ Corrección: columna 'contrasenaHash' no 'contrasena'
+  Future<void> actualizarContrasena(int id, String hashContrasena) async {
+    final db = await _db.database;
+    await db.update(
+      'usuarios',
+      {'contrasenaHash': hashContrasena},  // ← corrección aquí
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 }
+

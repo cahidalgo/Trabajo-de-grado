@@ -13,7 +13,8 @@ class EditarPerfilScreen extends StatefulWidget {
   const EditarPerfilScreen({super.key});
 
   @override
-  State<EditarPerfilScreen> createState() => _EditarPerfilScreenState();
+  State<EditarPerfilScreen> createState() =>
+      _EditarPerfilScreenState();
 }
 
 class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
@@ -23,6 +24,16 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   final _habilidadesCtrl = TextEditingController();
   final _usuarioRepo = UsuarioRepository();
 
+  // ── Cambio de contraseña ────────────────────────────────────
+  final _passActualCtrl = TextEditingController();
+  final _passNuevaCtrl = TextEditingController();
+  final _passConfirmCtrl = TextEditingController();
+  bool _seccionPassAbierta = false;
+  bool _verActual = false;
+  bool _verNueva = false;
+  bool _verConfirm = false;
+  String _passNueva = '';
+
   bool _cargando = true;
   bool _guardando = false;
   int? _usuarioId;
@@ -30,6 +41,36 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   String? _modalidadPreferida;
   String? _jornadaPreferida;
   final List<String> _areasSeleccionadas = [];
+
+  // ── Seguridad contraseña ────────────────────────────────────
+  int get _nivelSeguridad {
+    int n = 0;
+    if (_passNueva.length >= 8) n++;
+    if (_passNueva.contains(RegExp(r'[A-Z]'))) n++;
+    if (_passNueva.contains(RegExp(r'[0-9]'))) n++;
+    if (_passNueva.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-]'))) n++;
+    return n;
+  }
+
+  String get _textoSeguridad {
+    switch (_nivelSeguridad) {
+      case 0: case 1: return 'Muy débil';
+      case 2: return 'Débil';
+      case 3: return 'Aceptable';
+      case 4: return 'Fuerte';
+      default: return '';
+    }
+  }
+
+  Color get _colorSeguridad {
+    switch (_nivelSeguridad) {
+      case 0: case 1: return AppColors.error;
+      case 2: return const Color(0xFFFFA000);
+      case 3: return const Color(0xFF66BB6A);
+      case 4: return const Color(0xFF2E7D32);
+      default: return Colors.transparent;
+    }
+  }
 
   String _iniciales() {
     final nombre = _nombreCtrl.text.trim();
@@ -42,19 +83,18 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   }
 
   static const _nivelesEducativos = [
-    'Primaria incompleta',
-    'Primaria completa',
-    'Bachillerato incompleto',
-    'Bachillerato completo',
-    'Técnico / Tecnólogo',
-    'Universitario',
+    'Primaria incompleta', 'Primaria completa',
+    'Bachillerato incompleto', 'Bachillerato completo',
+    'Técnico / Tecnólogo', 'Universitario',
   ];
   static const _areas = [
     'Ventas', 'Gastronomía', 'Logística', 'Servicios',
     'Construcción', 'Aseo y limpieza', 'Vigilancia', 'Otro',
   ];
   static const _modalidades = ['Presencial', 'Virtual', 'Híbrida'];
-  static const _jornadas = ['Tiempo completo', 'Medio tiempo', 'Por horas'];
+  static const _jornadas = [
+    'Tiempo completo', 'Medio tiempo', 'Por horas'
+  ];
 
   @override
   void initState() {
@@ -81,10 +121,8 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
     final areas = perfil?.areasInteres ?? '';
     if (areas.isNotEmpty) {
       _areasSeleccionadas.addAll(
-        areas.split(',').map((a) => a.trim()).where((a) => a.isNotEmpty),
-      );
+          areas.split(',').map((a) => a.trim()).where((a) => a.isNotEmpty));
     }
-
     setState(() => _cargando = false);
   }
 
@@ -94,54 +132,138 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   }
 
   Future<void> _guardar() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _guardando = true);
+  if (!_formKey.currentState!.validate()) return;
 
-    if (_usuarioId != null && _nombreCtrl.text.trim().isNotEmpty) {
-      await _usuarioRepo.actualizarNombre(_usuarioId!, _nombreCtrl.text.trim());
-    }
-
-    final perfil = Perfil(
-      usuarioId: _usuarioId!,
-      nivelEducativo: _nivelEducativo,
-      experienciaLaboral: _experienciaCtrl.text.trim(),
-      habilidades: _habilidadesCtrl.text.trim(),
-      areasInteres: _areasSeleccionadas.join(', '),
-      modalidadPreferida: _modalidadPreferida,
-      jornadaPreferida: _jornadaPreferida,
-      perfilCompleto: _nivelEducativo != null &&
-          _experienciaCtrl.text.trim().isNotEmpty &&
-          _habilidadesCtrl.text.trim().isNotEmpty,
-    );
-
+  // ── 1. Cambio de contraseña (independiente del perfil) ────
+  if (_seccionPassAbierta &&
+      (_passActualCtrl.text.isNotEmpty ||
+          _passNuevaCtrl.text.isNotEmpty)) {
+    final errorPass = await _cambiarContrasena();
     if (!mounted) return;
-    await context.read<PerfilViewModel>().guardar(perfil);
-    setState(() => _guardando = false);
 
-    if (!mounted) return;
-    if (context.read<PerfilViewModel>().state == PerfilState.guardado) {
+    if (errorPass != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(errorPass),
+            backgroundColor: AppColors.error),
+      );
+      return;
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Perfil actualizado correctamente'),
+          content: Text('🔐 Contraseña actualizada correctamente'),
+          backgroundColor: Colors.green,
           duration: Duration(seconds: 2),
         ),
       );
-      Navigator.pop(context);
+      _passActualCtrl.clear();
+      _passNuevaCtrl.clear();
+      _passConfirmCtrl.clear();
+      setState(() {
+        _seccionPassAbierta = false;
+        _passNueva = '';
+      });
     }
   }
+
+  // ── 2. Guardar perfil solo si hay usuarioId válido ────────
+  if (_usuarioId == null) {
+    Navigator.pop(context);
+    return;
+  }
+
+  setState(() => _guardando = true);
+
+  // Actualizar nombre
+  if (_nombreCtrl.text.trim().isNotEmpty) {
+    await _usuarioRepo.actualizarNombre(
+        _usuarioId!, _nombreCtrl.text.trim());
+  }
+
+  final perfil = Perfil(
+    usuarioId: _usuarioId!,
+    nivelEducativo: _nivelEducativo,
+    experienciaLaboral: _experienciaCtrl.text.trim(),
+    habilidades: _habilidadesCtrl.text.trim(),
+    areasInteres: _areasSeleccionadas.join(', '),
+    modalidadPreferida: _modalidadPreferida,
+    jornadaPreferida: _jornadaPreferida,
+    perfilCompleto: _nivelEducativo != null &&
+        _experienciaCtrl.text.trim().isNotEmpty &&
+        _habilidadesCtrl.text.trim().isNotEmpty,
+  );
+
+  final vm = context.read<PerfilViewModel>();
+
+  try {
+    await vm.guardar(perfil);
+    setState(() => _guardando = false);
+    if (!mounted) return;
+
+    // ✅ Siempre mostrar éxito si no lanzó excepción
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('✅ Perfil actualizado correctamente'),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 2),
+      ),
+    );
+    vm.resetState();
+    Navigator.pop(context);
+
+  } catch (e) {
+    setState(() => _guardando = false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('❌ Error al guardar el perfil. Intenta de nuevo.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
+  Future<String?> _cambiarContrasena() async {
+    if (_passActualCtrl.text.isEmpty) return 'Ingresa tu contraseña actual';
+    if (_passNuevaCtrl.text.length < 8) {
+      return 'La nueva contraseña debe tener mínimo 8 caracteres';
+    }
+    if (_passNuevaCtrl.text != _passConfirmCtrl.text) {
+      return 'Las contraseñas no coinciden';
+    }
+
+    final usuario = await _usuarioRepo.obtenerPorId(_usuarioId!);
+    if (usuario == null) return 'No se encontró el usuario';
+
+    // ✅ sha256 — igual que auth_viewmodel y usuario_repository
+    if (usuario.contrasenaHash != _hash(_passActualCtrl.text)) {
+      return 'La contraseña actual es incorrecta';
+    }
+
+    await _usuarioRepo.actualizarContrasena(
+        _usuarioId!, _hash(_passNuevaCtrl.text));
+    return null;
+  }
+
+  // ✅ Usa el mismo sha256 del repositorio — NO hashCode
+  String _hash(String pass) => _usuarioRepo.hashContrasena(pass);
 
   @override
   void dispose() {
     _nombreCtrl.dispose();
     _experienciaCtrl.dispose();
     _habilidadesCtrl.dispose();
+    _passActualCtrl.dispose();
+    _passNuevaCtrl.dispose();
+    _passConfirmCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     if (_cargando) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+          body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -152,17 +274,11 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
             onPressed: _guardando ? null : _guardar,
             child: _guardando
                 ? const SizedBox(
-                    width: 20,
-                    height: 20,
+                    width: 20, height: 20,
                     child: CircularProgressIndicator(
-                      color: AppColors.primary,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Text(
-                    'Guardar',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                        color: AppColors.primary, strokeWidth: 2))
+                : const Text('Guardar',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -173,7 +289,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Avatar ────────────────────────────────────────────────
+              // ── Avatar ──────────────────────────────────────
               Center(
                 child: Column(
                   children: [
@@ -187,17 +303,15 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                     const Text(
                       'Toca el ícono para cambiar tu foto',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
+                          fontSize: 12,
+                          color: AppColors.textSecondary),
                     ),
                   ],
                 ),
               ),
-
               const SizedBox(height: 28),
 
-              // ── Datos personales ──────────────────────────────────────
+              // ── Datos personales ─────────────────────────────
               const _Subtitulo('Datos personales'),
               const SizedBox(height: 12),
               VoiceInputField(
@@ -207,10 +321,9 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                 validator: Validators.nombreCompleto,
                 textCapitalization: TextCapitalization.words,
               ),
-
               const SizedBox(height: 28),
 
-              // ── Nivel educativo ───────────────────────────────────────
+              // ── Nivel educativo ──────────────────────────────
               const _Subtitulo('Nivel educativo'),
               const SizedBox(height: 12),
               ..._nivelesEducativos.map(
@@ -220,10 +333,9 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                   onTap: () => setState(() => _nivelEducativo = n),
                 ),
               ),
-
               const SizedBox(height: 28),
 
-              // ── Experiencia y habilidades ─────────────────────────────
+              // ── Experiencia y habilidades ────────────────────
               const _Subtitulo('Experiencia y habilidades'),
               const SizedBox(height: 12),
               VoiceInputField(
@@ -237,14 +349,14 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
               VoiceInputField(
                 controller: _habilidadesCtrl,
                 labelText: 'Habilidades',
-                hintText: 'Ej: Atención al cliente, manejo de dinero...',
+                hintText:
+                    'Ej: Atención al cliente, manejo de dinero...',
                 validator: Validators.textoLargo,
                 maxLines: 3,
               ),
-
               const SizedBox(height: 28),
 
-              // ── Áreas de interés ──────────────────────────────────────
+              // ── Áreas de interés ─────────────────────────────
               const _Subtitulo('Áreas de interés'),
               const SizedBox(height: 12),
               Wrap(
@@ -255,62 +367,79 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                   return FilterChip(
                     label: Text(area),
                     selected: sel,
-                    onSelected: (v) => setState(
-                      () => v
-                          ? _areasSeleccionadas.add(area)
-                          : _areasSeleccionadas.remove(area),
-                    ),
+                    onSelected: (v) => setState(() => v
+                        ? _areasSeleccionadas.add(area)
+                        : _areasSeleccionadas.remove(area)),
                   );
                 }).toList(),
               ),
-
               const SizedBox(height: 28),
 
-              // ── Modalidad preferida ───────────────────────────────────
+              // ── Modalidad preferida ──────────────────────────
               const _Subtitulo('Modalidad preferida'),
               const SizedBox(height: 12),
               ..._modalidades.map(
                 (m) => _OpcionSeleccionable(
                   label: m,
                   seleccionado: _modalidadPreferida == m,
-                  onTap: () => setState(() => _modalidadPreferida = m),
+                  onTap: () =>
+                      setState(() => _modalidadPreferida = m),
                 ),
               ),
-
               const SizedBox(height: 28),
 
-              // ── Jornada preferida ─────────────────────────────────────
+              // ── Jornada preferida ────────────────────────────
               const _Subtitulo('Jornada preferida'),
               const SizedBox(height: 12),
               ..._jornadas.map(
                 (j) => _OpcionSeleccionable(
                   label: j,
                   seleccionado: _jornadaPreferida == j,
-                  onTap: () => setState(() => _jornadaPreferida = j),
+                  onTap: () =>
+                      setState(() => _jornadaPreferida = j),
                 ),
               ),
-
               const SizedBox(height: 32),
 
-              // ── Botón guardar final ───────────────────────────────────
+              // ── Sección cambiar contraseña ───────────────────
+              _SeccionContrasena(
+                abierta: _seccionPassAbierta,
+                onToggle: () => setState(
+                    () => _seccionPassAbierta = !_seccionPassAbierta),
+                passActualCtrl: _passActualCtrl,
+                passNuevaCtrl: _passNuevaCtrl,
+                passConfirmCtrl: _passConfirmCtrl,
+                verActual: _verActual,
+                verNueva: _verNueva,
+                verConfirm: _verConfirm,
+                onToggleVerActual: () =>
+                    setState(() => _verActual = !_verActual),
+                onToggleVerNueva: () =>
+                    setState(() => _verNueva = !_verNueva),
+                onToggleVerConfirm: () =>
+                    setState(() => _verConfirm = !_verConfirm),
+                passNueva: _passNueva,
+                nivelSeguridad: _nivelSeguridad,
+                textoSeguridad: _textoSeguridad,
+                colorSeguridad: _colorSeguridad,
+                onPassNuevaChanged: (v) =>
+                    setState(() => _passNueva = v),
+              ),
+              const SizedBox(height: 32),
+
+              // ── Botón guardar ────────────────────────────────
               ElevatedButton.icon(
                 onPressed: _guardando ? null : _guardar,
                 icon: _guardando
                     ? const SizedBox(
-                        width: 18,
-                        height: 18,
+                        width: 18, height: 18,
                         child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
+                            color: Colors.white, strokeWidth: 2))
                     : const Icon(Icons.save_outlined),
                 label: const Text('Guardar cambios'),
                 style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                ),
+                    minimumSize: const Size.fromHeight(52)),
               ),
-
               const SizedBox(height: 24),
             ],
           ),
@@ -320,6 +449,246 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   }
 }
 
+// ── Sección colapsable de contraseña ─────────────────────────────────────────
+class _SeccionContrasena extends StatelessWidget {
+  final bool abierta;
+  final VoidCallback onToggle;
+  final TextEditingController passActualCtrl;
+  final TextEditingController passNuevaCtrl;
+  final TextEditingController passConfirmCtrl;
+  final bool verActual;
+  final bool verNueva;
+  final bool verConfirm;
+  final VoidCallback onToggleVerActual;
+  final VoidCallback onToggleVerNueva;
+  final VoidCallback onToggleVerConfirm;
+  final String passNueva;
+  final int nivelSeguridad;
+  final String textoSeguridad;
+  final Color colorSeguridad;
+  final ValueChanged<String> onPassNuevaChanged;
+
+  const _SeccionContrasena({
+    required this.abierta,
+    required this.onToggle,
+    required this.passActualCtrl,
+    required this.passNuevaCtrl,
+    required this.passConfirmCtrl,
+    required this.verActual,
+    required this.verNueva,
+    required this.verConfirm,
+    required this.onToggleVerActual,
+    required this.onToggleVerNueva,
+    required this.onToggleVerConfirm,
+    required this.passNueva,
+    required this.nivelSeguridad,
+    required this.textoSeguridad,
+    required this.colorSeguridad,
+    required this.onPassNuevaChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: onToggle,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: abierta
+                  ? AppColors.primaryLight
+                  : const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: abierta
+                    ? AppColors.primary.withOpacity(0.4)
+                    : AppColors.border,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.lock_outline,
+                    color: abierta
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
+                    size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Cambiar contraseña',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: abierta
+                          ? AppColors.primary
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                Icon(
+                  abierta
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                  color: AppColors.textSecondary,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (abierta) ...[
+          const SizedBox(height: 16),
+          _CampoPass(
+            controller: passActualCtrl,
+            label: 'Contraseña actual',
+            hint: 'Ingresa tu contraseña actual',
+            ver: verActual,
+            onToggleVer: onToggleVerActual,
+          ),
+          const SizedBox(height: 12),
+          _CampoPass(
+            controller: passNuevaCtrl,
+            label: 'Nueva contraseña',
+            hint: 'Mín. 8 caracteres, 1 mayúscula, 1 número',
+            ver: verNueva,
+            onToggleVer: onToggleVerNueva,
+            onChanged: onPassNuevaChanged,
+          ),
+          if (passNueva.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: List.generate(4, (i) => Expanded(
+                child: Container(
+                  margin: EdgeInsets.only(right: i < 3 ? 4 : 0),
+                  height: 4,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    color: i < nivelSeguridad
+                        ? colorSeguridad
+                        : const Color(0xFFE0E0E0),
+                  ),
+                ),
+              )),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Seguridad: $textoSeguridad',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: colorSeguridad,
+                  fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            _Requisito(
+                cumplido: passNueva.length >= 8,
+                texto: 'Mínimo 8 caracteres'),
+            _Requisito(
+                cumplido: passNueva.contains(RegExp(r'[A-Z]')),
+                texto: 'Al menos una mayúscula'),
+            _Requisito(
+                cumplido: passNueva.contains(RegExp(r'[0-9]')),
+                texto: 'Al menos un número'),
+            _Requisito(
+                cumplido: passNueva.contains(
+                    RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-]')),
+                texto: 'Al menos un carácter especial'),
+          ],
+          const SizedBox(height: 12),
+          _CampoPass(
+            controller: passConfirmCtrl,
+            label: 'Confirmar nueva contraseña',
+            hint: 'Repite la nueva contraseña',
+            ver: verConfirm,
+            onToggleVer: onToggleVerConfirm,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _CampoPass extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final String hint;
+  final bool ver;
+  final VoidCallback onToggleVer;
+  final ValueChanged<String>? onChanged;
+
+  const _CampoPass({
+    required this.controller,
+    required this.label,
+    required this.hint,
+    required this.ver,
+    required this.onToggleVer,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      obscureText: !ver,
+      onChanged: onChanged,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: const Icon(Icons.lock_outline),
+        suffixIcon: IconButton(
+          icon: Icon(
+            ver
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
+            color: AppColors.textSecondary,
+            size: 20,
+          ),
+          onPressed: onToggleVer,
+        ),
+      ),
+    );
+  }
+}
+
+class _Requisito extends StatelessWidget {
+  final bool cumplido;
+  final String texto;
+  const _Requisito({required this.cumplido, required this.texto});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: Row(
+        children: [
+          Icon(
+            cumplido
+                ? Icons.check_circle_outline
+                : Icons.radio_button_unchecked,
+            size: 14,
+            color: cumplido
+                ? const Color(0xFF2E7D32)
+                : AppColors.textSecondary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            texto,
+            style: TextStyle(
+              fontSize: 12,
+              color: cumplido
+                  ? const Color(0xFF2E7D32)
+                  : AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Widgets base ──────────────────────────────────────────────────────────────
 class _Subtitulo extends StatelessWidget {
   final String texto;
   const _Subtitulo(this.texto);
@@ -352,7 +721,8 @@ class _OpcionSeleccionable extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(
+            horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
@@ -368,14 +738,16 @@ class _OpcionSeleccionable extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight:
-                      seleccionado ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: seleccionado
+                      ? FontWeight.w600
+                      : FontWeight.normal,
                   color: AppColors.textPrimary,
                 ),
               ),
             ),
             if (seleccionado)
-              const Icon(Icons.check_circle, color: AppColors.primary, size: 22),
+              const Icon(Icons.check_circle,
+                  color: AppColors.primary, size: 22),
           ],
         ),
       ),

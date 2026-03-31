@@ -65,4 +65,14 @@ class EmpresaRepository {
       whereArgs: [empresa.id],
     );
   }
+
+  Future<void> actualizarContrasena(int id, String hashContrasena) async {
+    final db = await _db.database;
+    await db.update(
+      'empresas',
+      {'contrasena': hashContrasena},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 }

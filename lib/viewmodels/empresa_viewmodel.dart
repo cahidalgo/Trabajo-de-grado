@@ -76,7 +76,6 @@ class EmpresaViewModel extends ChangeNotifier {
     );
 
     final id = await _repo.registrarEmpresa(empresa);
-
     empresaActual = empresa.copyWith(id: id);
     await _persistirSesion(id);
 
@@ -106,7 +105,6 @@ class EmpresaViewModel extends ChangeNotifier {
     return true;
   }
 
-  /// Actualiza los datos editables de la empresa
   Future<bool> actualizarPerfil({
     required String razonSocial,
     required String telefono,
@@ -120,7 +118,8 @@ class EmpresaViewModel extends ChangeNotifier {
     final actualizada = empresaActual!.copyWith(
       razonSocial: razonSocial,
       telefono: telefono.trim().isEmpty ? null : telefono.trim(),
-      descripcion: descripcion.trim().isEmpty ? null : descripcion.trim(),
+      descripcion:
+          descripcion.trim().isEmpty ? null : descripcion.trim(),
     );
 
     await _repo.actualizarEmpresa(actualizada);
@@ -131,10 +130,20 @@ class EmpresaViewModel extends ChangeNotifier {
     return true;
   }
 
-  /// Guarda ruta de foto de perfil de la empresa
   Future<void> actualizarFoto(String rutaFoto) async {
     if (empresaActual == null) return;
-    final actualizada = empresaActual!.copyWith(fotoPerfil: rutaFoto);
+    final actualizada =
+        empresaActual!.copyWith(fotoPerfil: rutaFoto);
+    await _repo.actualizarEmpresa(actualizada);
+    empresaActual = actualizada;
+    notifyListeners();
+  }
+
+  // ✅ Método correcto — usa copyWith con contrasenaHash
+  Future<void> actualizarContrasena(String hashContrasena) async {
+    if (empresaActual == null) return;
+    final actualizada =
+        empresaActual!.copyWith(contrasenaHash: hashContrasena);
     await _repo.actualizarEmpresa(actualizada);
     empresaActual = actualizada;
     notifyListeners();
