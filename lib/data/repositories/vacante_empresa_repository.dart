@@ -48,4 +48,14 @@ class VacanteEmpresaRepository {
       ORDER BY p.fecha_postulacion DESC
     ''', [vacanteId]);
   }
+
+  Future<void> actualizarVacante(VacanteEmpresaModel vacante) async {
+    final db = await _db.database;
+    await db.update(
+      'vacantes_empresa',
+      vacante.toMap(),
+      where: 'id = ?',
+      whereArgs: [vacante.id],
+    );
+  }
 }

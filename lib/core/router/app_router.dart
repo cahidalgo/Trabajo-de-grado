@@ -15,6 +15,8 @@ import '../../views/empresas/editar_empresa_screen.dart';
 import '../../views/empresas/mis_vacantes_screen.dart';
 import '../../views/empresas/postulantes_screen.dart';
 import '../../data/models/vacante_empresa_model.dart';
+import '../../views/empresas/editar_vacante_screen.dart';
+
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -57,6 +59,13 @@ final appRouter = GoRouter(
         final vacante = state.extra as VacanteEmpresaModel;
         return PostulantesScreen(vacante: vacante);
       },
+    ),
+
+    GoRoute(
+    path: '/empresa/editar-vacante',
+    builder: (_, state) => EditarVacanteScreen(
+    vacante: state.extra as VacanteEmpresaModel,
+      ),
     ),
   ],
 );

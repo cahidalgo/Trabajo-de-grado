@@ -49,4 +49,17 @@ class VacanteEmpresaViewModel extends ChangeNotifier {
     cargando = false;
     notifyListeners();
   }
+
+  Future<void> actualizarVacante(VacanteEmpresaModel vacante) async {
+    cargando = true;
+    notifyListeners();
+    await _repo.actualizarVacante(vacante);
+    // ✅ Corrección: usar 'vacantes' no '_vacantes'
+    final idx = vacantes.indexWhere((v) => v.id == vacante.id);
+    if (idx != -1) {
+      vacantes[idx] = vacante;
+    }
+    cargando = false;
+    notifyListeners();
+  }
 }

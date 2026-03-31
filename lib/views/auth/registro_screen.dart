@@ -5,7 +5,6 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/utils/validators.dart';
-import '../../core/widgets/password_strength_indicator.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 
 class RegistroScreen extends StatefulWidget {
@@ -32,6 +31,49 @@ class _RegistroScreenState extends State<RegistroScreen>
 
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
+
+  // ── Evaluación de seguridad ──────────────────────────────────
+  int get _nivelSeguridad {
+    int nivel = 0;
+    if (_passActual.length >= 8) nivel++;
+    if (_passActual.contains(RegExp(r'[A-Z]'))) nivel++;
+    if (_passActual.contains(RegExp(r'[0-9]'))) nivel++;
+    if (_passActual
+        .contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-]'))) nivel++;
+    return nivel;
+  }
+
+  String get _textoSeguridad {
+    switch (_nivelSeguridad) {
+      case 0:
+      case 1:
+        return 'Muy débil';
+      case 2:
+        return 'Débil';
+      case 3:
+        return 'Aceptable';
+      case 4:
+        return 'Fuerte';
+      default:
+        return '';
+    }
+  }
+
+  Color get _colorSeguridad {
+    switch (_nivelSeguridad) {
+      case 0:
+      case 1:
+        return AppColors.error;
+      case 2:
+        return const Color(0xFFFFA000);
+      case 3:
+        return const Color(0xFF66BB6A);
+      case 4:
+        return const Color(0xFF2E7D32);
+      default:
+        return Colors.transparent;
+    }
+  }
 
   @override
   void initState() {
@@ -80,10 +122,8 @@ class _RegistroScreenState extends State<RegistroScreen>
             Icon(Icons.privacy_tip_outlined,
                 color: AppColors.primary, size: 22),
             SizedBox(width: 10),
-            Text(
-              'Política de privacidad',
-              style: TextStyle(fontSize: 17),
-            ),
+            Text('Política de privacidad',
+                style: TextStyle(fontSize: 17)),
           ],
         ),
         content: const SingleChildScrollView(
@@ -93,7 +133,9 @@ class _RegistroScreenState extends State<RegistroScreen>
             'postulaciones a vacantes, hacer seguimiento de oportunidades '
             'laborales y mejorar el funcionamiento de la aplicación ',
             style: TextStyle(
-                color: AppColors.textSecondary, fontSize: 13, height: 1.5),
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                height: 1.5),
           ),
         ),
         actions: [
@@ -140,19 +182,14 @@ class _RegistroScreenState extends State<RegistroScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 8),
-
-                // ── Subtítulo ─────────────────────────────────────────
                 const Text(
                   'Crea tu cuenta para encontrar trabajo.',
                   style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
+                      fontSize: 14, color: AppColors.textSecondary),
                 ),
-
                 const SizedBox(height: 28),
 
-                // ── Error global ──────────────────────────────────────
+                // ── Error global ─────────────────────────────────
                 if (vm.state == AuthState.error) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -180,7 +217,7 @@ class _RegistroScreenState extends State<RegistroScreen>
                   const SizedBox(height: 20),
                 ],
 
-                // ── Nombre completo ───────────────────────────────────
+                // ── Nombre completo ──────────────────────────────
                 const _FieldLabel('Nombre completo'),
                 const SizedBox(height: 8),
                 _VoiceField(
@@ -190,10 +227,9 @@ class _RegistroScreenState extends State<RegistroScreen>
                   validator: Validators.nombreCompleto,
                   textCapitalization: TextCapitalization.words,
                 ),
-
                 const SizedBox(height: 20),
 
-                // ── Toggle correo / celular ────────────────────────────
+                // ── Toggle correo / celular ───────────────────────
                 _ContactToggle(
                   usandoCelular: _usandoCelular,
                   onChanged: (v) => setState(() {
@@ -203,7 +239,7 @@ class _RegistroScreenState extends State<RegistroScreen>
                 ),
                 const SizedBox(height: 12),
 
-                // ── Campo dinámico correo / celular ───────────────────
+                // ── Campo dinámico correo / celular ──────────────
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 250),
                   child: _usandoCelular
@@ -226,10 +262,9 @@ class _RegistroScreenState extends State<RegistroScreen>
                           validator: Validators.correoOTelefono,
                         ),
                 ),
-
                 const SizedBox(height: 20),
 
-                // ── Contraseña ────────────────────────────────────────
+                // ── Contraseña ───────────────────────────────────
                 const _FieldLabel(AppStrings.passLabel),
                 const SizedBox(height: 8),
                 TextFormField(
@@ -253,12 +288,61 @@ class _RegistroScreenState extends State<RegistroScreen>
                   ),
                   validator: Validators.contrasena,
                 ),
-                const SizedBox(height: 8),
-                PasswordStrengthIndicator(password: _passActual),
+
+                // ── Indicador de seguridad ───────────────────────
+                if (_passActual.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: List.generate(4, (i) {
+                      return Expanded(
+                        child: Container(
+                          margin:
+                              EdgeInsets.only(right: i < 3 ? 4 : 0),
+                          height: 4,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(4),
+                            color: i < _nivelSeguridad
+                                ? _colorSeguridad
+                                : const Color(0xFFE0E0E0),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Seguridad: $_textoSeguridad',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _colorSeguridad,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _RequisitoContrasena(
+                    cumplido: _passActual.length >= 8,
+                    texto: 'Mínimo 8 caracteres',
+                  ),
+                  _RequisitoContrasena(
+                    cumplido:
+                        _passActual.contains(RegExp(r'[A-Z]')),
+                    texto: 'Al menos una mayúscula',
+                  ),
+                  _RequisitoContrasena(
+                    cumplido:
+                        _passActual.contains(RegExp(r'[0-9]')),
+                    texto: 'Al menos un número',
+                  ),
+                  _RequisitoContrasena(
+                    cumplido: _passActual.contains(
+                        RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-]')),
+                    texto: 'Al menos un carácter especial',
+                  ),
+                ],
 
                 const SizedBox(height: 20),
 
-                // ── Confirmar contraseña ──────────────────────────────
+                // ── Confirmar contraseña ─────────────────────────
                 const _FieldLabel('Confirmar contraseña'),
                 const SizedBox(height: 8),
                 TextFormField(
@@ -285,7 +369,7 @@ class _RegistroScreenState extends State<RegistroScreen>
 
                 const SizedBox(height: 24),
 
-                // ── Política de privacidad ────────────────────────────
+                // ── Política de privacidad ───────────────────────
                 _PrivacyCheckbox(
                   value: _aceptoPolitica,
                   mostrarError: _politicaError,
@@ -298,34 +382,32 @@ class _RegistroScreenState extends State<RegistroScreen>
 
                 const SizedBox(height: 28),
 
-                // ── Botón crear cuenta ────────────────────────────────
+                // ── Botón crear cuenta ───────────────────────────
                 ElevatedButton(
                   onPressed: cargando ? null : _onRegistrar,
                   style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(52),
-                  ),
+                      minimumSize: const Size.fromHeight(52)),
                   child: cargando
                       ? const SizedBox(
                           height: 22,
                           width: 22,
                           child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
+                              color: Colors.white, strokeWidth: 2),
                         )
                       : const Text('Crear cuenta'),
                 ),
 
                 const SizedBox(height: 24),
 
-                // ── Link a login ──────────────────────────────────────
+                // ── Link a login ─────────────────────────────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text(
                       '¿Ya tienes cuenta? ',
                       style: TextStyle(
-                          color: AppColors.textSecondary, fontSize: 14),
+                          color: AppColors.textSecondary,
+                          fontSize: 14),
                     ),
                     GestureDetector(
                       onTap: () => context.go('/login'),
@@ -340,7 +422,6 @@ class _RegistroScreenState extends State<RegistroScreen>
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 40),
               ],
             ),
@@ -351,7 +432,45 @@ class _RegistroScreenState extends State<RegistroScreen>
   }
 }
 
-// ── Label de campo ───────────────────────────────────────────────────────────
+// ── Requisito contraseña ──────────────────────────────────────────────────────
+class _RequisitoContrasena extends StatelessWidget {
+  final bool cumplido;
+  final String texto;
+  const _RequisitoContrasena(
+      {required this.cumplido, required this.texto});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: Row(
+        children: [
+          Icon(
+            cumplido
+                ? Icons.check_circle_outline
+                : Icons.radio_button_unchecked,
+            size: 14,
+            color: cumplido
+                ? const Color(0xFF2E7D32)
+                : AppColors.textSecondary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            texto,
+            style: TextStyle(
+              fontSize: 12,
+              color: cumplido
+                  ? const Color(0xFF2E7D32)
+                  : AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Label de campo ────────────────────────────────────────────────────────────
 class _FieldLabel extends StatelessWidget {
   final String text;
   const _FieldLabel(this.text);
@@ -367,7 +486,7 @@ class _FieldLabel extends StatelessWidget {
       );
 }
 
-// ── Campo con voz (estilo de la app) ─────────────────────────────────────────
+// ── Campo con voz ─────────────────────────────────────────────────────────────
 class _VoiceField extends StatefulWidget {
   final TextEditingController controller;
   final String hintText;
@@ -436,9 +555,12 @@ class _VoiceFieldState extends State<_VoiceField> {
         suffixIcon: IconButton(
           tooltip: _escuchando ? 'Detener' : 'Dictar con voz',
           icon: Icon(
-            _escuchando ? Icons.mic_rounded : Icons.mic_none_rounded,
-            color:
-                _escuchando ? AppColors.primary : AppColors.textSecondary,
+            _escuchando
+                ? Icons.mic_rounded
+                : Icons.mic_none_rounded,
+            color: _escuchando
+                ? AppColors.primary
+                : AppColors.textSecondary,
             size: 22,
           ),
           onPressed: _toggleVoz,
@@ -453,8 +575,8 @@ class _VoiceFieldState extends State<_VoiceField> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(
-              color: AppColors.primary, width: 1.5),
+          borderSide:
+              const BorderSide(color: AppColors.primary, width: 1.5),
         ),
         fillColor: _escuchando
             ? AppColors.primaryLight
@@ -484,12 +606,12 @@ class _ContactToggle extends StatelessWidget {
       child: Row(
         children: [
           _ToggleOption(
-            label: '✉️  Correo',
+            label: '✉️ Correo',
             selected: !usandoCelular,
             onTap: () => onChanged(false),
           ),
           _ToggleOption(
-            label: '📱  Celular',
+            label: '📱 Celular',
             selected: usandoCelular,
             onTap: () => onChanged(true),
           ),
@@ -586,8 +708,9 @@ class _PrivacyCheckbox extends StatelessWidget {
                   width: 22,
                   height: 22,
                   decoration: BoxDecoration(
-                    color:
-                        value ? AppColors.primary : Colors.transparent,
+                    color: value
+                        ? AppColors.primary
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
                       color: value
@@ -607,9 +730,8 @@ class _PrivacyCheckbox extends StatelessWidget {
                     text: TextSpan(
                       text: 'He leído y acepto la ',
                       style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
-                      ),
+                          color: AppColors.textSecondary,
+                          fontSize: 13),
                       children: [
                         WidgetSpan(
                           child: GestureDetector(
@@ -639,7 +761,8 @@ class _PrivacyCheckbox extends StatelessWidget {
             padding: EdgeInsets.only(top: 6, left: 4),
             child: Text(
               'Debes aceptar la política de privacidad para continuar',
-              style: TextStyle(color: AppColors.error, fontSize: 12),
+              style:
+                  TextStyle(color: AppColors.error, fontSize: 12),
             ),
           ),
       ],

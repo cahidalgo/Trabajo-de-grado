@@ -41,15 +41,22 @@ class MisVacantesScreen extends StatelessWidget {
             color: AppColors.primary,
           );
         }
-
         final vacante = vm.vacantes[index - 1];
         return _TarjetaVacanteEmpresa(
           vacante: vacante,
           onToggle: () => vm.toggleActiva(vacante),
-          onEliminar: () =>
-              _confirmarEliminar(ctx, vacante, vm),
+          onEliminar: () => _confirmarEliminar(ctx, vacante, vm),
           onVerPostulantes: () =>
               context.push('/empresa/postulantes', extra: vacante),
+          onEditar: () async {
+            await context.push('/empresa/editar-vacante',
+                extra: vacante);
+            // Recargar tras editar
+            final empresaId = vacante.empresaId;
+            await ctx
+                .read<VacanteEmpresaViewModel>()
+                .cargarVacantes(empresaId);
+          },
         );
       },
     );
@@ -77,10 +84,8 @@ class MisVacantesScreen extends StatelessWidget {
               vm.eliminar(vacante);
               Navigator.pop(context);
             },
-            child: const Text(
-              'Eliminar',
-              style: TextStyle(color: AppColors.error),
-            ),
+            child: const Text('Eliminar',
+                style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -88,18 +93,20 @@ class MisVacantesScreen extends StatelessWidget {
   }
 }
 
-// ── Tarjeta bonita al estilo vacantes de vendedores ───────────────────────────
+// ── Tarjeta ───────────────────────────────────────────────────────────────────
 class _TarjetaVacanteEmpresa extends StatelessWidget {
   final VacanteEmpresaModel vacante;
   final VoidCallback onToggle;
   final VoidCallback onEliminar;
   final VoidCallback onVerPostulantes;
+  final VoidCallback onEditar;
 
   const _TarjetaVacanteEmpresa({
     required this.vacante,
     required this.onToggle,
     required this.onEliminar,
     required this.onVerPostulantes,
+    required this.onEditar,
   });
 
   static const _coloresSector = <String, List<Color>>{
@@ -127,8 +134,7 @@ class _TarjetaVacanteEmpresa extends StatelessWidget {
     final sector = vacante.sector;
     final colores = _coloresSector[sector] ??
         [const Color(0xFFF5F5F5), AppColors.primary];
-    final icono =
-        _iconosSector[sector] ?? Icons.work_outline;
+    final icono = _iconosSector[sector] ?? Icons.work_outline;
     final bgColor = colores[0];
     final acColor = colores[1];
     final activa = vacante.activa;
@@ -147,7 +153,7 @@ class _TarjetaVacanteEmpresa extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Header con color de sector ───────────────
+              // ── Header ────────────────────────────────────────
               Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 16, vertical: 14),
@@ -160,10 +166,9 @@ class _TarjetaVacanteEmpresa extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 22,
-                      backgroundColor:
-                          acColor.withOpacity(0.15),
-                      child: Icon(icono,
-                          color: acColor, size: 22),
+                      backgroundColor: acColor.withOpacity(0.15),
+                      child:
+                          Icon(icono, color: acColor, size: 22),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -192,32 +197,14 @@ class _TarjetaVacanteEmpresa extends StatelessWidget {
                         ],
                       ),
                     ),
-                    // Badge estado
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: activa
-                            ? const Color(0xFF43A047)
-                            : const Color(0xFFBDBDBD),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        activa ? 'Activa' : 'Inactiva',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
 
-              // ── Chips de info ────────────────────────────
+              // ── Chips de info ──────────────────────────────────
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+                padding:
+                    const EdgeInsets.fromLTRB(14, 12, 14, 4),
                 child: Wrap(
                   spacing: 6,
                   runSpacing: 6,
@@ -233,9 +220,10 @@ class _TarjetaVacanteEmpresa extends StatelessWidget {
                 ),
               ),
 
-              // ── Salario y fecha ──────────────────────────
+              // ── Salario y fecha ────────────────────────────────
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 6, 14, 12),
+                padding:
+                    const EdgeInsets.fromLTRB(14, 6, 14, 12),
                 child: Row(
                   children: [
                     if (vacante.salarioReferencial != null) ...[
@@ -252,9 +240,9 @@ class _TarjetaVacanteEmpresa extends StatelessWidget {
                       ),
                     ],
                     const Spacer(),
-                    if (vacante.fechaCierre != null)
+                    if (vacante.fechaCierre.isNotEmpty)
                       Text(
-                        'Cierre: ${_formatFecha(vacante.fechaCierre!)}',
+                        'Cierre: ${_formatFecha(vacante.fechaCierre)}',
                         style: const TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary,
@@ -264,7 +252,7 @@ class _TarjetaVacanteEmpresa extends StatelessWidget {
                 ),
               ),
 
-              // ── Etiquetas de inclusión ───────────────────
+              // ── Etiquetas de inclusión ─────────────────────────
               if (_tieneEtiquetas)
                 Padding(
                   padding:
@@ -292,12 +280,32 @@ class _TarjetaVacanteEmpresa extends StatelessWidget {
 
               const Divider(height: 1),
 
-              // ── Acciones ─────────────────────────────────
+              // ── Acciones — badge integrado aquí para evitar solapamiento ──
               Padding(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 4),
+                    horizontal: 8, vertical: 6),
                 child: Row(
                   children: [
+                    // Badge estado
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: activa
+                            ? const Color(0xFF43A047)
+                            : const Color(0xFFBDBDBD),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        activa ? 'Activa' : 'Inactiva',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
                     // Postulantes
                     TextButton.icon(
                       onPressed: onVerPostulantes,
@@ -308,9 +316,16 @@ class _TarjetaVacanteEmpresa extends StatelessWidget {
                               fontSize: 12, color: acColor)),
                       style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8)),
+                              horizontal: 6)),
                     ),
                     const Spacer(),
+                    // Editar
+                    IconButton(
+                      icon: Icon(Icons.edit_outlined,
+                          color: acColor, size: 22),
+                      tooltip: 'Editar vacante',
+                      onPressed: onEditar,
+                    ),
                     // Activar/desactivar
                     IconButton(
                       icon: Icon(
@@ -322,8 +337,7 @@ class _TarjetaVacanteEmpresa extends StatelessWidget {
                             : const Color(0xFFBDBDBD),
                         size: 28,
                       ),
-                      tooltip:
-                          activa ? 'Desactivar' : 'Activar',
+                      tooltip: activa ? 'Desactivar' : 'Activar',
                       onPressed: onToggle,
                     ),
                     // Eliminar
@@ -379,13 +393,11 @@ class _PillChip extends StatelessWidget {
           children: [
             Icon(icono, size: 11, color: color),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                  fontSize: 11,
-                  color: color,
-                  fontWeight: FontWeight.w500),
-            ),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: color,
+                    fontWeight: FontWeight.w500)),
           ],
         ),
       );
@@ -412,13 +424,11 @@ class _EtiquetaChip extends StatelessWidget {
             Icon(icono,
                 size: 11, color: const Color(0xFF6A1B9A)),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF6A1B9A),
-                  fontWeight: FontWeight.w500),
-            ),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF6A1B9A),
+                    fontWeight: FontWeight.w500)),
           ],
         ),
       );
