@@ -72,11 +72,11 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
       return;
     }
 
-    final empresaId =
-        context.read<EmpresaViewModel>().empresaActual!.id!;
+    final empresaVm = context.read<EmpresaViewModel>();
+    final empresa = empresaVm.empresaActual!;
 
     final vacante = VacanteEmpresaModel(
-      empresaId: empresaId,
+      empresaId: empresa.id!,
       titulo: _tituloCtrl.text.trim(),
       descripcion: _descripcionCtrl.text.trim(),
       sector: _sector,
@@ -94,25 +94,125 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
       fechaPublicacion: DateTime.now().toIso8601String(),
     );
 
-    final ok =
-        await context.read<VacanteEmpresaViewModel>().publicar(vacante);
+    final ok = await context.read<VacanteEmpresaViewModel>().publicar(vacante);
 
     if (ok && mounted) {
-      context.push(
-        '/empresa/publicar-confirmacion',
-        extra: _tituloCtrl.text.trim(),
-      );
+      context.push('/empresa/publicar-confirmacion', extra: {
+        'titulo': _tituloCtrl.text.trim(),
+        'validada': empresa.validado,
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final empresa = context.watch<EmpresaViewModel>().empresaActual;
     final vm = context.watch<VacanteEmpresaViewModel>();
 
+    // ── Gate: empresa no validada ─────────────────────────────
+    if (empresa != null && !empresa.validado) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Publicar vacante'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            onPressed: () => context.go('/empresa/dashboard'),
+          ),
+        ),
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: const Color(0xFFFFCC02).withOpacity(0.5)),
+                  ),
+                  child: const Icon(
+                    Icons.lock_clock_outlined,
+                    color: Color(0xFFE65100),
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Empresa pendiente de validación',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Para publicar vacantes tu empresa debe estar validada por el equipo de Formalia.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                    height: 1.6,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 28),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8F0),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFFFCC80)),
+                  ),
+                  child: const Column(
+                    children: [
+                      _PasoValidacion(
+                        numero: '1',
+                        texto: 'Tu empresa fue registrada exitosamente.',
+                        completado: true,
+                      ),
+                      SizedBox(height: 12),
+                      _PasoValidacion(
+                        numero: '2',
+                        texto:
+                            'El equipo de Vendedores TM revisará tu información y la validará en un plazo de 1 a 3 días hábiles.',
+                        completado: false,
+                      ),
+                      SizedBox(height: 12),
+                      _PasoValidacion(
+                        numero: '3',
+                        texto:
+                            'Una vez validada, podrás publicar vacantes y comenzar a recibir postulantes.',
+                        completado: false,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.go('/empresa/dashboard'),
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Volver al inicio'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ── Formulario normal (empresa validada) ──────────────────
     return Scaffold(
       appBar: AppBar(
         title: const Text('Publicar vacante'),
-        // ── Botón retroceder ──────────────────────────────────
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => context.go('/empresa/dashboard'),
@@ -190,7 +290,7 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
                 controller: _salarioCtrl,
                 decoration: const InputDecoration(
                   labelText: 'Salario o rango (opcional)',
-                  hintText: 'Ej: \$1.300.000 - \$1.500.000',
+                  hintText: r'Ej: $1.300.000 - $1.500.000',
                 ),
               ),
               const SizedBox(height: 12),
@@ -342,10 +442,75 @@ class _PublicarVacanteScreenState extends State<PublicarVacanteScreen> {
   }
 }
 
-// ── Pantalla de confirmación ──────────────────────────────────────────────────
+// ── Widget auxiliar: paso del proceso de validación ───────────
+class _PasoValidacion extends StatelessWidget {
+  final String numero;
+  final String texto;
+  final bool completado;
+
+  const _PasoValidacion({
+    required this.numero,
+    required this.texto,
+    required this.completado,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            color: completado
+                ? const Color(0xFF2E7D32)
+                : const Color(0xFFE65100).withOpacity(0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: completado
+                ? const Icon(Icons.check, color: Colors.white, size: 14)
+                : Text(
+                    numero,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFE65100),
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            texto,
+            style: TextStyle(
+              fontSize: 13,
+              color: completado
+                  ? AppColors.textSecondary
+                  : AppColors.textPrimary,
+              height: 1.5,
+              fontWeight:
+                  completado ? FontWeight.normal : FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Pantalla de confirmación ──────────────────────────────────
 class VacantePublicadaScreen extends StatelessWidget {
   final String titulo;
-  const VacantePublicadaScreen({super.key, required this.titulo});
+  final bool empresaValidada;
+
+  const VacantePublicadaScreen({
+    super.key,
+    required this.titulo,
+    required this.empresaValidada,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -359,26 +524,28 @@ class VacantePublicadaScreen extends StatelessWidget {
             children: [
               const SizedBox(height: 40),
 
+              // ── Ícono de éxito ──────────────────────────────
               Center(
                 child: Container(
-                  width: 80,
-                  height: 80,
+                  width: 88,
+                  height: 88,
                   decoration: BoxDecoration(
                     color: const Color(0xFFE8F5E9),
                     shape: BoxShape.circle,
                     border: Border.all(
-                        color: const Color(0xFF2E7D32).withOpacity(0.3)),
+                        color: const Color(0xFF2E7D32).withOpacity(0.3),
+                        width: 2),
                   ),
                   child: const Icon(
                     Icons.check_circle_outline,
                     color: Color(0xFF2E7D32),
-                    size: 44,
+                    size: 48,
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
 
+              // ── Título ──────────────────────────────────────
               const Text(
                 '¡Vacante registrada!',
                 style: TextStyle(
@@ -398,55 +565,37 @@ class VacantePublicadaScreen extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-
               const SizedBox(height: 28),
 
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF8E1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFFFCC02)),
+              // ── Banner de estado: validada vs pendiente ─────
+              if (empresaValidada)
+                _BannerEstado(
+                  icono: Icons.visibility_outlined,
+                  iconoColor: const Color(0xFF1565C0),
+                  fondo: const Color(0xFFE3F2FD),
+                  borde: const Color(0xFF90CAF9),
+                  titulo: 'Vacante publicada y visible',
+                  cuerpo:
+                      'Tu vacante ya está disponible para los candidatos en la sección de Vacantes. Los postulantes podrán encontrarla y postularse de inmediato.',
+                  tituloColor: const Color(0xFF1565C0),
+                  cuerpoColor: const Color(0xFF37474F),
+                )
+              else
+                _BannerEstado(
+                  icono: Icons.lock_clock_outlined,
+                  iconoColor: const Color(0xFFE65100),
+                  fondo: const Color(0xFFFFF8E1),
+                  borde: const Color(0xFFFFCC02),
+                  titulo: 'Pendiente: empresa no validada',
+                  cuerpo:
+                      'Esta vacante quedó guardada pero no será visible para los candidatos hasta que el equipo de Vendedores TM valide tu empresa.',
+                  tituloColor: const Color(0xFFE65100),
+                  cuerpoColor: const Color(0xFF6D4C41),
                 ),
-                child: const Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.access_time_outlined,
-                        color: Color(0xFFE65100), size: 22),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Pendiente de validación',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFE65100),
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Esta vacante aún no será visible para los '
-                            'candidatos en la sección de Vacantes. '
-                            'Estará disponible una vez que tu empresa '
-                            'sea validada por el equipo de Formalia.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF6D4C41),
-                              height: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
+              // ── Info adicional ──────────────────────────────
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -461,8 +610,8 @@ class VacantePublicadaScreen extends StatelessWidget {
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Puedes ver tus vacantes registradas en la '
-                        'sección "Mis vacantes" de tu perfil de empresa.',
+                        'Puedes gestionar tus vacantes desde la sección '
+                        '"Mis vacantes" en el panel de tu empresa.',
                         style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
@@ -476,23 +625,89 @@ class VacantePublicadaScreen extends StatelessWidget {
 
               const SizedBox(height: 32),
 
-              ElevatedButton(
-                onPressed: () => context.go(
-                  '/empresa/publicar',
-                  extra: DateTime.now().millisecondsSinceEpoch.toString(),
-                ),
-                child: const Text('Publicar otra vacante'),
+              // ── Acciones ────────────────────────────────────
+              ElevatedButton.icon(
+                onPressed: () => context.go('/empresa/publicar'),
+                icon: const Icon(Icons.add_circle_outline),
+                label: const Text('Publicar otra vacante'),
               ),
               const SizedBox(height: 12),
-              OutlinedButton(
+              OutlinedButton.icon(
                 onPressed: () => context.go('/empresa/dashboard'),
-                child: const Text('Volver al inicio'),
+                icon: const Icon(Icons.dashboard_outlined),
+                label: const Text('Volver al panel'),
               ),
 
               const SizedBox(height: 24),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Banner de estado reutilizable ─────────────────────────────
+class _BannerEstado extends StatelessWidget {
+  final IconData icono;
+  final Color iconoColor;
+  final Color fondo;
+  final Color borde;
+  final String titulo;
+  final String cuerpo;
+  final Color tituloColor;
+  final Color cuerpoColor;
+
+  const _BannerEstado({
+    required this.icono,
+    required this.iconoColor,
+    required this.fondo,
+    required this.borde,
+    required this.titulo,
+    required this.cuerpo,
+    required this.tituloColor,
+    required this.cuerpoColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: fondo,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borde),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icono, color: iconoColor, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titulo,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: tituloColor,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  cuerpo,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cuerpoColor,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

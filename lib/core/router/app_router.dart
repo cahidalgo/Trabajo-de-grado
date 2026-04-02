@@ -10,6 +10,7 @@ import '../../views/legal/politica_privacidad_screen.dart';
 import '../../views/empresas/empresa_registro_screen.dart';
 import '../../views/empresas/empresa_dashboard_screen.dart';
 import '../../views/empresas/publicar_vacante_screen.dart';
+import '../../views/empresas/mis_vacantes_screen.dart';
 import '../../views/empresas/postulantes_screen.dart';
 import '../../views/admin/admin_shell_screen.dart';
 import '../../data/models/vacante_empresa_model.dart';
@@ -30,6 +31,16 @@ final appRouter = GoRouter(
     GoRoute(path: '/empresa/registro', builder: (_, __) => const EmpresaRegistroScreen()),
     GoRoute(path: '/empresa/dashboard', builder: (_, __) => const EmpresaDashboardScreen()),
     GoRoute(path: '/empresa/publicar', builder: (_, __) => const PublicarVacanteScreen()),
+    GoRoute(
+      path: '/empresa/publicar-confirmacion',
+      builder: (_, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return VacantePublicadaScreen(
+          titulo: extra['titulo'] as String,
+          empresaValidada: extra['validada'] as bool,
+        );
+      },
+    ),
     GoRoute(
       path: '/empresa/postulantes',
       builder: (_, state) {
