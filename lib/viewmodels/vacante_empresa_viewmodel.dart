@@ -50,6 +50,19 @@ class VacanteEmpresaViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> actualizarEstadoPostulante(
+      int postulacionId, String estado, int vacanteEmpresaId) async {
+    await _repo.actualizarEstadoPostulacion(postulacionId, estado);
+    // Refrescar lista en memoria sin volver a la BD innecesariamente
+    postulantes = postulantes.map((p) {
+      if (p['postulacion_id'] == postulacionId) {
+        return {...p, 'estado': estado};
+      }
+      return p;
+    }).toList();
+    notifyListeners();
+  }
+
   Future<void> actualizarVacante(VacanteEmpresaModel vacante) async {
     cargando = true;
     notifyListeners();

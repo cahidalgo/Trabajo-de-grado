@@ -121,23 +121,36 @@ class VacanteEmpresaRepository {
   Future<List<Map<String, dynamic>>> obtenerPostulantesPorVacante(
       int vacanteEmpresaId) async {
     final db = await _db.database;
-    // Obtener el ID espejo en `vacantes` para buscar las postulaciones
     final vacanteId = await _obtenerVacanteEspejoId(db, vacanteEmpresaId);
     if (vacanteId == null) return [];
 
     return await db.rawQuery('''
       SELECT
-        u.nombreCompleto           AS nombre,
-        u.correoOTelefono          AS correo_o_celular,
-        COALESCE(pf.nivelEducativo, '-') AS nivel_educativo,
-        p.fechaPostulacion         AS fecha_postulacion,
+        p.id                                AS postulacion_id,
+        u.nombreCompleto                    AS nombre,
+        u.correoOTelefono                   AS correo_o_celular,
+        COALESCE(pf.nivelEducativo, '-')    AS nivel_educativo,
+        COALESCE(pf.habilidades, '')        AS habilidades,
+        COALESCE(pf.experienciaLaboral, '') AS experiencia,
+        p.fechaPostulacion                  AS fecha_postulacion,
         p.estado
       FROM postulaciones p
-      INNER JOIN usuarios u  ON p.usuarioId  = u.id
+      INNER JOIN usuarios u   ON p.usuarioId  = u.id
       LEFT  JOIN perfiles  pf ON pf.usuarioId = u.id
       WHERE p.vacanteId = ?
       ORDER BY p.fechaPostulacion DESC
     ''', [vacanteId]);
+  }
+
+  Future<void> actualizarEstadoPostulacion(
+      int postulacionId, String estado) async {
+    final db = await _db.database;
+    await db.update(
+      'postulaciones',
+      {'estado': estado},
+      where: 'id = ?',
+      whereArgs: [postulacionId],
+    );
   }
 
   // ── Helpers privados ──────────────────────────────────────────────────────

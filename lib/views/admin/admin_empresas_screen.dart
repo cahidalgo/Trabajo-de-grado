@@ -53,6 +53,7 @@ class _AdminEmpresasScreenState extends State<AdminEmpresasScreen>
             ),
             child: TabBar(
               controller: _tabCtrl,
+              isScrollable: true,
               indicatorColor: AppColors.primary,
               indicatorWeight: 3,
               labelColor: AppColors.primary,
@@ -187,6 +188,7 @@ class _EmpresaCard extends StatelessWidget {
                   const BorderRadius.vertical(top: Radius.circular(15)),
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   width: 46,
@@ -222,17 +224,22 @@ class _EmpresaCard extends StatelessWidget {
                           fontSize: 16,
                           color: AppColors.textPrimary,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 3),
                       Text(
                         empresa.sector,
                         style: const TextStyle(
                             fontSize: 13, color: AppColors.textSecondary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: 10),
+                      _BadgeEstado(validada: validada),
                     ],
                   ),
                 ),
-                _BadgeEstado(validada: validada),
               ],
             ),
           ),
