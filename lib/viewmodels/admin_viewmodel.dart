@@ -17,16 +17,22 @@ class AdminViewModel extends ChangeNotifier {
   List<Map<String, dynamic>> vacantes = [];
 
   bool cargando = false;
+  String? errorMsg;
 
   Future<void> cargarTodo() async {
     cargando = true;
+    errorMsg = null;
     notifyListeners();
-    await Future.wait([
-      _cargarStats(),
-      _cargarEmpresas(),
-      _cargarUsuarios(),
-      _cargarVacantes(),
-    ]);
+    try {
+      await Future.wait([
+        _cargarStats(),
+        _cargarEmpresas(),
+        _cargarUsuarios(),
+        _cargarVacantes(),
+      ]);
+    } catch (e) {
+      errorMsg = 'Error al cargar datos: $e';
+    }
     cargando = false;
     notifyListeners();
   }
@@ -55,16 +61,39 @@ class AdminViewModel extends ChangeNotifier {
     vacantes = await _repo.listarVacantesConEmpresa();
   }
 
-  Future<void> validarEmpresa(int id) async {
-    await _repo.validarEmpresa(id);
-    await Future.wait([_cargarEmpresas(), _cargarStats()]);
-    notifyListeners();
+  /// Retorna true si la validación fue exitosa
+  Future<bool> validarEmpresa(int id) async {
+    try {
+      await _repo.validarEmpresa(id);
+      await Future.wait([_cargarEmpresas(), _cargarStats()]);
+      notifyListeners();
+      // Verificar que realmente se validó
+      final empresa = empresas.where((e) => e.id == id).firstOrNull;
+      if (empresa != null && !empresa.validado) {
+        errorMsg = 'No se pudo validar la empresa. Verifica los permisos '
+            'RLS en Supabase para la tabla "empresas".';
+        notifyListeners();
+        return false;
+      }
+      return true;
+    } catch (e) {
+      errorMsg = 'Error al validar empresa: $e';
+      notifyListeners();
+      return false;
+    }
   }
 
-  Future<void> revocarEmpresa(int id) async {
-    await _repo.revocarEmpresa(id);
-    await Future.wait([_cargarEmpresas(), _cargarStats()]);
-    notifyListeners();
+  Future<bool> revocarEmpresa(int id) async {
+    try {
+      await _repo.revocarEmpresa(id);
+      await Future.wait([_cargarEmpresas(), _cargarStats()]);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      errorMsg = 'Error al revocar empresa: $e';
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> toggleVacante(int id, bool estaActiva) async {

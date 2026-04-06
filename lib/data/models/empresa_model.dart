@@ -1,5 +1,6 @@
 class EmpresaModel {
   final int? id;
+  final String? authId;     // UUID de auth.users
   final String razonSocial;
   final String nit;
   final String sector;
@@ -7,12 +8,12 @@ class EmpresaModel {
   final String? telefono;
   final String? descripcion;
   final String? fotoPerfil;
-  final String contrasenaHash;
   final bool validado;
   final String fechaRegistro;
 
   EmpresaModel({
     this.id,
+    this.authId,
     required this.razonSocial,
     required this.nit,
     required this.sector,
@@ -20,13 +21,13 @@ class EmpresaModel {
     this.telefono,
     this.descripcion,
     this.fotoPerfil,
-    required this.contrasenaHash,
     this.validado = false,
     required this.fechaRegistro,
   });
 
   EmpresaModel copyWith({
     int? id,
+    String? authId,
     String? razonSocial,
     String? nit,
     String? sector,
@@ -34,52 +35,64 @@ class EmpresaModel {
     String? telefono,
     String? descripcion,
     String? fotoPerfil,
-    String? contrasenaHash,
     bool? validado,
     String? fechaRegistro,
   }) =>
       EmpresaModel(
-        id: id ?? this.id,
-        razonSocial: razonSocial ?? this.razonSocial,
-        nit: nit ?? this.nit,
-        sector: sector ?? this.sector,
-        correo: correo ?? this.correo,
-        telefono: telefono ?? this.telefono,
-        descripcion: descripcion ?? this.descripcion,
-        fotoPerfil: fotoPerfil ?? this.fotoPerfil,
-        contrasenaHash: contrasenaHash ?? this.contrasenaHash,
-        validado: validado ?? this.validado,
+        id:            id ?? this.id,
+        authId:        authId ?? this.authId,
+        razonSocial:   razonSocial ?? this.razonSocial,
+        nit:           nit ?? this.nit,
+        sector:        sector ?? this.sector,
+        correo:        correo ?? this.correo,
+        telefono:      telefono ?? this.telefono,
+        descripcion:   descripcion ?? this.descripcion,
+        fotoPerfil:    fotoPerfil ?? this.fotoPerfil,
+        validado:      validado ?? this.validado,
         fechaRegistro: fechaRegistro ?? this.fechaRegistro,
       );
 
   Map<String, dynamic> toMap() {
     final map = <String, dynamic>{
-      'razon_social': razonSocial,
-      'nit': nit,
-      'sector': sector,
-      'correo': correo,
-      'telefono': telefono,
-      'descripcion': descripcion,
-      'foto_perfil': fotoPerfil,
-      'contrasena_hash': contrasenaHash,
-      'validado': validado ? 1 : 0,
+      'razon_social':  razonSocial,
+      'nit':           nit,
+      'sector':        sector,
+      'correo':        correo,
+      'telefono':      telefono,
+      'descripcion':   descripcion,
+      'foto_perfil':   fotoPerfil,
+      'validado':      validado,
       'fecha_registro': fechaRegistro,
     };
     if (id != null) map['id'] = id;
+    if (authId != null) map['auth_id'] = authId;
     return map;
   }
 
+  /// Map sin id ni auth_id, seguro para UPDATE en Supabase
+  Map<String, dynamic> toUpdateMap() => {
+    'razon_social':   razonSocial,
+    'nit':            nit,
+    'sector':         sector,
+    'correo':         correo,
+    'telefono':       telefono,
+    'descripcion':    descripcion,
+    'foto_perfil':    fotoPerfil,
+    'validado':       validado,
+    'fecha_registro': fechaRegistro,
+  };
+
   factory EmpresaModel.fromMap(Map<String, dynamic> map) => EmpresaModel(
-        id: map['id'],
-        razonSocial: map['razon_social'],
-        nit: map['nit'],
-        sector: map['sector'],
-        correo: map['correo'],
-        telefono: map['telefono'],
-        descripcion: map['descripcion'],
-        fotoPerfil: map['foto_perfil'],
-        contrasenaHash: map['contrasena_hash'],
-        validado: map['validado'] == 1,
-        fechaRegistro: map['fecha_registro'],
-      );
+    id:            map['id'] as int?,
+    authId:        map['auth_id'] as String?,
+    razonSocial:   map['razon_social'] as String? ?? '',
+    nit:           map['nit'] as String? ?? '',
+    sector:        map['sector'] as String? ?? '',
+    correo:        map['correo'] as String? ?? '',
+    telefono:      map['telefono'] as String?,
+    descripcion:   map['descripcion'] as String?,
+    fotoPerfil:    map['foto_perfil'] as String?,
+    validado:      map['validado'] == true || map['validado'] == 1,
+    fechaRegistro: map['fecha_registro'] as String? ?? '',
+  );
 }

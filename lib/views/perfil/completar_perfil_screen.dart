@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/supabase_service.dart';
 import '../../core/utils/validators.dart';
 import '../../data/models/perfil.dart';
 import '../../viewmodels/perfil_viewmodel.dart';
@@ -67,10 +67,20 @@ class _CompletarPerfilScreenState extends State<CompletarPerfilScreen> {
     }
   }
 
+  Future<int?> _getUsuarioId() async {
+    final authId = SupabaseService.currentAuthId;
+    if (authId == null) return null;
+    final data = await SupabaseService.client
+        .from('usuarios')
+        .select('id')
+        .eq('auth_id', authId)
+        .maybeSingle();
+    return data?['id'] as int?;
+  }
+
   Future<void> _guardarYContinuar() async {
     if (!_validarPasoActual()) return;
-    final prefs = await SharedPreferences.getInstance();
-    final usuarioId = prefs.getInt('usuarioId');
+    final usuarioId = await _getUsuarioId();
     if (usuarioId == null) return;
     final perfil = Perfil(
       usuarioId: usuarioId,

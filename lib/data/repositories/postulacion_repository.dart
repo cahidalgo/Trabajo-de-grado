@@ -1,38 +1,46 @@
-import '../database/database_helper.dart';
+import '../../core/services/supabase_service.dart';
 
 class PostulacionRepository {
-  final _db = DatabaseHelper();
+  final _db = SupabaseService.client;
 
   Future<bool> yaSePostulo(int usuarioId, int vacanteId) async {
-    final db     = await _db.database;
-    final result = await db.query(
-      'postulaciones',
-      where: 'usuarioId = ? AND vacanteId = ?',
-      whereArgs: [usuarioId, vacanteId],
-    );
-    return result.isNotEmpty;
+    final data = await _db
+        .from('postulaciones')
+        .select('id')
+        .eq('usuario_id', usuarioId)
+        .eq('vacante_id', vacanteId)
+        .maybeSingle();
+    return data != null;
   }
 
   Future<void> registrar(int usuarioId, int vacanteId) async {
-    final db = await _db.database;
-    await db.insert('postulaciones', {
-      'usuarioId':        usuarioId,
-      'vacanteId':        vacanteId,
-      'fechaPostulacion': DateTime.now().toIso8601String(),
-      'estado':           'Enviada',
+    await _db.from('postulaciones').insert({
+      'usuario_id': usuarioId,
+      'vacante_id': vacanteId,
+      'estado':     'Enviada',
     });
   }
 
-  // Devuelve las postulaciones junto con el título y empresa de la vacante
-  Future<List<Map<String, dynamic>>> obtenerHistorial(int usuarioId) async {
-    final db = await _db.database;
-    return await db.rawQuery('''
-      SELECT p.id, p.fechaPostulacion, p.estado,
-             v.titulo, v.empresa, v.categoria, v.modalidad
-      FROM postulaciones p
-      INNER JOIN vacantes v ON p.vacanteId = v.id
-      WHERE p.usuarioId = ?
-      ORDER BY p.fechaPostulacion DESC
-    ''', [usuarioId]);
+  // Historial con JOIN a vacantes para título, empresa, categoría
+  Future<List<Map<String, dynamic>>> obtenerHistorial(
+      int usuarioId) async {
+    final data = await _db
+        .from('postulaciones')
+        .select('id, fecha_postulacion, estado, vacantes(titulo, empresa, categoria, modalidad)')
+        .eq('usuario_id', usuarioId)
+        .order('fecha_postulacion', ascending: false);
+
+    return (data as List).map((p) {
+      final v = p['vacantes'] as Map<String, dynamic>? ?? {};
+      return {
+        'id':               p['id'],
+        'fechaPostulacion': p['fecha_postulacion'] ?? '',
+        'estado':           p['estado'] ?? 'Enviada',
+        'titulo':           v['titulo'] ?? '',
+        'empresa':          v['empresa'] ?? '',
+        'categoria':        v['categoria'] ?? '',
+        'modalidad':        v['modalidad'] ?? '',
+      };
+    }).toList();
   }
 }

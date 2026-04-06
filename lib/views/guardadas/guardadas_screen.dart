@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/services/supabase_service.dart';
 import '../../core/utils/category_style.dart';
 import '../../core/widgets/app_ui.dart';
 import '../../data/models/vacante.dart';
@@ -35,8 +35,15 @@ class _GuardadasScreenState extends State<GuardadasScreen>
 
   Future<void> _cargar() async {
     setState(() => _cargando = true);
-    final prefs = await SharedPreferences.getInstance();
-    _usuarioId = prefs.getInt('usuarioId');
+    final authId = SupabaseService.currentAuthId;
+    if (authId != null) {
+      final data = await SupabaseService.client
+          .from('usuarios')
+          .select('id')
+          .eq('auth_id', authId)
+          .maybeSingle();
+      _usuarioId = data?['id'] as int?;
+    }
     if (_usuarioId != null) {
       _guardadas = await _repo.obtenerGuardadas(_usuarioId!);
     }

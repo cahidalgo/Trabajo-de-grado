@@ -22,26 +22,26 @@ class Perfil {
   });
 
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'usuarioId': usuarioId,
-    'nivelEducativo': nivelEducativo,
-    'experienciaLaboral': experienciaLaboral,
-    'habilidades': habilidades,
-    'areasInteres': areasInteres,
-    'modalidadPreferida': modalidadPreferida,
-    'jornadaPreferida': jornadaPreferida,
-    'perfilCompleto': perfilCompleto ? 1 : 0,
+    if (id != null) 'id': id,
+    'usuario_id':          usuarioId,
+    'nivel_educativo':     nivelEducativo,
+    'experiencia_laboral': experienciaLaboral,
+    'habilidades':         habilidades,
+    'areas_interes':       areasInteres,
+    'modalidad_preferida': modalidadPreferida,
+    'jornada_preferida':   jornadaPreferida,
+    'perfil_completo':     perfilCompleto,
   };
 
   factory Perfil.fromMap(Map<String, dynamic> map) => Perfil(
-    id: map['id'],
-    usuarioId: map['usuarioId'],
-    nivelEducativo: map['nivelEducativo'],
-    experienciaLaboral: map['experienciaLaboral'],
-    habilidades: map['habilidades'],
-    areasInteres: map['areasInteres'],
-    modalidadPreferida: map['modalidadPreferida'],
-    jornadaPreferida: map['jornadaPreferida'],
-    perfilCompleto: map['perfilCompleto'] == 1,
+    id:                 map['id'] as int?,
+    usuarioId:          map['usuario_id'] as int,
+    nivelEducativo:     map['nivel_educativo'] as String?,
+    experienciaLaboral: map['experiencia_laboral'] as String?,
+    habilidades:        map['habilidades'] as String?,
+    areasInteres:       map['areas_interes'] as String?,
+    modalidadPreferida: map['modalidad_preferida'] as String?,
+    jornadaPreferida:   map['jornada_preferida'] as String?,
+    perfilCompleto:     map['perfil_completo'] == true || map['perfil_completo'] == 1,
   );
 }

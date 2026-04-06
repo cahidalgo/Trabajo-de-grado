@@ -1,24 +1,37 @@
-import '../database/database_helper.dart';
+import '../../core/services/supabase_service.dart';
 import '../models/perfil.dart';
 
 class PerfilRepository {
-  final _db = DatabaseHelper();
+  final _db = SupabaseService.client;
 
   Future<void> guardar(Perfil perfil) async {
-    final db = await _db.database;
-    final existe = await db.query('perfiles', where: 'usuarioId = ?', whereArgs: [perfil.usuarioId]);
-    if (existe.isEmpty) {
-      await db.insert('perfiles', perfil.toMap());
+    final existe = await _db
+        .from('perfiles')
+        .select('id')
+        .eq('usuario_id', perfil.usuarioId)
+        .maybeSingle();
+
+    final map = perfil.toMap();
+    map.remove('id'); // nunca enviar id en insert/update
+
+    if (existe == null) {
+      await _db.from('perfiles').insert(map);
     } else {
-      await db.update('perfiles', perfil.toMap(), where: 'usuarioId = ?', whereArgs: [perfil.usuarioId]);
+      await _db
+          .from('perfiles')
+          .update(map)
+          .eq('usuario_id', perfil.usuarioId);
     }
   }
 
   Future<Perfil?> obtenerPorUsuario(int usuarioId) async {
-    final db = await _db.database;
-    final result = await db.query('perfiles', where: 'usuarioId = ?', whereArgs: [usuarioId]);
-    if (result.isEmpty) return null;
-    return Perfil.fromMap(result.first);
+    final data = await _db
+        .from('perfiles')
+        .select()
+        .eq('usuario_id', usuarioId)
+        .maybeSingle();
+    if (data == null) return null;
+    return Perfil.fromMap(data);
   }
 
   Future<bool> estaCompleto(int usuarioId) async {

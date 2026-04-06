@@ -3,11 +3,11 @@ import '../data/repositories/vacante_empresa_repository.dart';
 import '../data/models/vacante_empresa_model.dart';
 
 class VacanteEmpresaViewModel extends ChangeNotifier {
-  final VacanteEmpresaRepository _repo = VacanteEmpresaRepository();
+  final _repo = VacanteEmpresaRepository();
 
-  List<VacanteEmpresaModel> vacantes = [];
+  List<VacanteEmpresaModel>  vacantes   = [];
   List<Map<String, dynamic>> postulantes = [];
-  bool cargando = false;
+  bool    cargando     = false;
   String? errorMensaje;
 
   Future<void> cargarVacantes(int empresaId) async {
@@ -42,6 +42,16 @@ class VacanteEmpresaViewModel extends ChangeNotifier {
     await cargarVacantes(vacante.empresaId);
   }
 
+  Future<void> actualizarVacante(VacanteEmpresaModel vacante) async {
+    cargando = true;
+    notifyListeners();
+    await _repo.actualizarVacante(vacante);
+    final idx = vacantes.indexWhere((v) => v.id == vacante.id);
+    if (idx != -1) vacantes[idx] = vacante;
+    cargando = false;
+    notifyListeners();
+  }
+
   Future<void> cargarPostulantes(int vacanteId) async {
     cargando = true;
     notifyListeners();
@@ -53,26 +63,12 @@ class VacanteEmpresaViewModel extends ChangeNotifier {
   Future<void> actualizarEstadoPostulante(
       int postulacionId, String estado, int vacanteEmpresaId) async {
     await _repo.actualizarEstadoPostulacion(postulacionId, estado);
-    // Refrescar lista en memoria sin volver a la BD innecesariamente
     postulantes = postulantes.map((p) {
       if (p['postulacion_id'] == postulacionId) {
         return {...p, 'estado': estado};
       }
       return p;
     }).toList();
-    notifyListeners();
-  }
-
-  Future<void> actualizarVacante(VacanteEmpresaModel vacante) async {
-    cargando = true;
-    notifyListeners();
-    await _repo.actualizarVacante(vacante);
-    // ✅ Corrección: usar 'vacantes' no '_vacantes'
-    final idx = vacantes.indexWhere((v) => v.id == vacante.id);
-    if (idx != -1) {
-      vacantes[idx] = vacante;
-    }
-    cargando = false;
     notifyListeners();
   }
 }

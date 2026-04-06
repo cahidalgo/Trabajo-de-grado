@@ -15,7 +15,6 @@ class VacanteEmpresaModel {
   final String? zonaPortal;
   final bool incluyeFormacion;
   final String fechaPublicacion;
-  // ID espejo en la tabla `vacantes` (se asigna tras el dual-write)
   final int? vacanteId;
 
   VacanteEmpresaModel({
@@ -40,46 +39,45 @@ class VacanteEmpresaModel {
 
   Map<String, dynamic> toMap() {
     final map = <String, dynamic>{
-      'empresa_id': empresaId,
-      'titulo': titulo,
-      'descripcion': descripcion,
-      'sector': sector,
-      'modalidad': modalidad,
-      'jornada': jornada,
-      'salario_referencial': salarioReferencial,
-      'fecha_cierre': fechaCierre,
-      'activa': activa ? 1 : 0,
-      'acepta_experiencia_informal': aceptaExperienciaInformal ? 1 : 0,
-      'acepta_pep_ppt': aceptaPepPpt ? 1 : 0,
-      'horario_flexible': horarioFlexible ? 1 : 0,
-      'zona_portal': zonaPortal,
-      'incluye_formacion': incluyeFormacion ? 1 : 0,
-      'fecha_publicacion': fechaPublicacion,
-      'vacante_id': vacanteId,
+      'empresa_id':                  empresaId,
+      'titulo':                      titulo,
+      'descripcion':                 descripcion,
+      'sector':                      sector,
+      'modalidad':                   modalidad,
+      'jornada':                     jornada,
+      'salario_referencial':         salarioReferencial,
+      'fecha_cierre':                fechaCierre,
+      'activa':                      activa,
+      'acepta_experiencia_informal': aceptaExperienciaInformal,
+      'acepta_pep_ppt':              aceptaPepPpt,
+      'horario_flexible':            horarioFlexible,
+      'zona_portal':                 zonaPortal,
+      'incluye_formacion':           incluyeFormacion,
+      'fecha_publicacion':           fechaPublicacion,
+      'vacante_id':                  vacanteId,
     };
-    // No incluir `id` al insertar (AUTOINCREMENT lo genera la BD)
     if (id != null) map['id'] = id;
     return map;
   }
 
   factory VacanteEmpresaModel.fromMap(Map<String, dynamic> map) =>
       VacanteEmpresaModel(
-        id: map['id'],
-        empresaId: map['empresa_id'],
-        titulo: map['titulo'],
-        descripcion: map['descripcion'],
-        sector: map['sector'],
-        modalidad: map['modalidad'],
-        jornada: map['jornada'],
-        salarioReferencial: map['salario_referencial'],
-        fechaCierre: map['fecha_cierre'],
-        activa: map['activa'] == 1,
-        aceptaExperienciaInformal: map['acepta_experiencia_informal'] == 1,
-        aceptaPepPpt: map['acepta_pep_ppt'] == 1,
-        horarioFlexible: map['horario_flexible'] == 1,
-        zonaPortal: map['zona_portal'],
-        incluyeFormacion: map['incluye_formacion'] == 1,
-        fechaPublicacion: map['fecha_publicacion'],
-        vacanteId: map['vacante_id'],
+        id:                          map['id'] as int?,
+        empresaId:                   map['empresa_id'] as int,
+        titulo:                      map['titulo'] as String? ?? '',
+        descripcion:                 map['descripcion'] as String? ?? '',
+        sector:                      map['sector'] as String? ?? '',
+        modalidad:                   map['modalidad'] as String? ?? '',
+        jornada:                     map['jornada'] as String? ?? '',
+        salarioReferencial:          map['salario_referencial'] as String?,
+        fechaCierre:                 map['fecha_cierre'] as String? ?? '',
+        activa:                      map['activa'] == true || map['activa'] == 1,
+        aceptaExperienciaInformal:   map['acepta_experiencia_informal'] == true,
+        aceptaPepPpt:                map['acepta_pep_ppt'] == true,
+        horarioFlexible:             map['horario_flexible'] == true,
+        zonaPortal:                  map['zona_portal'] as String?,
+        incluyeFormacion:            map['incluye_formacion'] == true,
+        fechaPublicacion:            map['fecha_publicacion'] as String? ?? '',
+        vacanteId:                   map['vacante_id'] as int?,
       );
 }

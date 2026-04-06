@@ -1,45 +1,43 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/services/supabase_service.dart';
 import '../data/models/empresa_model.dart';
 import '../data/repositories/empresa_repository.dart';
 
+/// Traduce mensajes de error de Supabase Auth a español
+String _traducirErrorAuth(String msg) {
+  if (msg.contains('invalid') && msg.contains('mail')) {
+    return 'El correo electrónico no es válido. Usa un correo real (ej: empresa@gmail.com).';
+  }
+  if (msg.contains('already registered')) {
+    return 'Este correo ya está registrado en el sistema.';
+  }
+  if (msg.contains('weak_password') || msg.contains('password')) {
+    return 'La contraseña no cumple los requisitos mínimos.';
+  }
+  return 'Error de autenticación: $msg';
+}
+
 class EmpresaViewModel extends ChangeNotifier {
-  final EmpresaRepository _repo = EmpresaRepository();
+  final _repo = EmpresaRepository();
 
   EmpresaModel? empresaActual;
-  String? errorMensaje;
-  bool cargando = false;
+  String?       errorMensaje;
+  bool          cargando = false;
 
-  Future<void> _persistirSesion(int empresaId) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('usuarioId');
-    await prefs.setInt('empresaId', empresaId);
-    await prefs.setString('rolUsuario', 'empresa');
-  }
-
+  // ── Restaurar sesión activa ───────────────────────────────────
   Future<void> restaurarSesion() async {
     if (empresaActual != null) return;
-
     cargando = true;
-    errorMensaje = null;
     notifyListeners();
 
-    final prefs = await SharedPreferences.getInstance();
-    final empresaId = prefs.getInt('empresaId');
-
-    if (empresaId != null) {
-      empresaActual = await _repo.obtenerPorId(empresaId);
-      if (empresaActual == null) {
-        await prefs.remove('empresaId');
-        await prefs.remove('rolUsuario');
-      }
-    }
+    empresaActual = await _repo.obtenerActual();
 
     cargando = false;
     notifyListeners();
   }
 
+  // ── Registro ──────────────────────────────────────────────────
   Future<bool> registrar({
     required String razonSocial,
     required String nit,
@@ -48,78 +46,84 @@ class EmpresaViewModel extends ChangeNotifier {
     String? telefono,
     required String contrasena,
   }) async {
-    cargando = true;
-    errorMensaje = null;
+    cargando      = true;
+    errorMensaje  = null;
     notifyListeners();
 
     if (await _repo.nitExiste(nit)) {
       errorMensaje = 'Este NIT ya está registrado.';
-      cargando = false;
+      cargando     = false;
       notifyListeners();
       return false;
     }
     if (await _repo.correoExiste(correo)) {
       errorMensaje = 'Este correo ya está registrado.';
-      cargando = false;
+      cargando     = false;
       notifyListeners();
       return false;
     }
 
-    final empresa = EmpresaModel(
-      razonSocial: razonSocial,
-      nit: nit,
-      sector: sector,
-      correo: correo,
-      telefono: telefono,
-      contrasenaHash: contrasena,
-      fechaRegistro: DateTime.now().toIso8601String(),
-    );
-
-    final id = await _repo.registrarEmpresa(empresa);
-    empresaActual = empresa.copyWith(id: id);
-    await _persistirSesion(id);
+    try {
+      empresaActual = await _repo.registrarEmpresa(
+        razonSocial: razonSocial,
+        nit:         nit,
+        sector:      sector,
+        correo:      correo,
+        telefono:    telefono,
+        contrasena:  contrasena,
+      );
+    } on AuthException catch (e) {
+      errorMensaje = _traducirErrorAuth(e.message);
+      cargando     = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      errorMensaje = 'Error al registrar la empresa. Intenta de nuevo.';
+      cargando     = false;
+      notifyListeners();
+      return false;
+    }
 
     cargando = false;
     notifyListeners();
     return true;
   }
 
+  // ── Login ─────────────────────────────────────────────────────
   Future<bool> iniciarSesion(String correo, String contrasena) async {
-    cargando = true;
+    cargando     = true;
     errorMensaje = null;
     notifyListeners();
 
     final empresa = await _repo.login(correo, contrasena);
     if (empresa == null) {
       errorMensaje = 'Correo o contraseña incorrectos.';
-      cargando = false;
+      cargando     = false;
       notifyListeners();
       return false;
     }
 
     empresaActual = empresa;
-    await _persistirSesion(empresa.id!);
-
-    cargando = false;
+    cargando      = false;
     notifyListeners();
     return true;
   }
 
+  // ── Actualizar perfil ─────────────────────────────────────────
   Future<bool> actualizarPerfil({
     required String razonSocial,
     required String telefono,
     required String descripcion,
   }) async {
     if (empresaActual == null) return false;
-    cargando = true;
+    cargando     = true;
     errorMensaje = null;
     notifyListeners();
 
     final actualizada = empresaActual!.copyWith(
       razonSocial: razonSocial,
-      telefono: telefono.trim().isEmpty ? null : telefono.trim(),
-      descripcion:
-          descripcion.trim().isEmpty ? null : descripcion.trim(),
+      telefono:    telefono.trim().isEmpty ? null : telefono.trim(),
+      descripcion: descripcion.trim().isEmpty ? null : descripcion.trim(),
     );
 
     await _repo.actualizarEmpresa(actualizada);
@@ -132,28 +136,19 @@ class EmpresaViewModel extends ChangeNotifier {
 
   Future<void> actualizarFoto(String rutaFoto) async {
     if (empresaActual == null) return;
-    final actualizada =
-        empresaActual!.copyWith(fotoPerfil: rutaFoto);
+    final actualizada = empresaActual!.copyWith(fotoPerfil: rutaFoto);
     await _repo.actualizarEmpresa(actualizada);
     empresaActual = actualizada;
     notifyListeners();
   }
 
-  // ✅ Método correcto — usa copyWith con contrasenaHash
-  Future<void> actualizarContrasena(String hashContrasena) async {
-    if (empresaActual == null) return;
-    final actualizada =
-        empresaActual!.copyWith(contrasenaHash: hashContrasena);
-    await _repo.actualizarEmpresa(actualizada);
-    empresaActual = actualizada;
-    notifyListeners();
+  Future<void> actualizarContrasena(String nuevaContrasena) async {
+    await _repo.actualizarContrasena(nuevaContrasena);
   }
 
+  // ── Cerrar sesión ─────────────────────────────────────────────
   Future<void> cerrarSesion() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('usuarioId');
-    await prefs.remove('empresaId');
-    await prefs.remove('rolUsuario');
+    await SupabaseService.client.auth.signOut();
     empresaActual = null;
     notifyListeners();
   }

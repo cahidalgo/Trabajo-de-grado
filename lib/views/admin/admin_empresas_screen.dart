@@ -293,12 +293,16 @@ class _EmpresaCard extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () async {
-                        await vm.validarEmpresa(empresa.id!);
+                        final ok = await vm.validarEmpresa(empresa.id!);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('✅ Empresa validada correctamente'),
-                              backgroundColor: Color(0xFF2E7D32),
+                            SnackBar(
+                              content: Text(ok
+                                  ? '✅ Empresa validada correctamente'
+                                  : vm.errorMsg ?? '❌ No se pudo validar la empresa'),
+                              backgroundColor: ok
+                                  ? const Color(0xFF2E7D32)
+                                  : AppColors.error,
                             ),
                           );
                         }

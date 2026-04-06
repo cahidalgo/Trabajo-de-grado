@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/supabase_service.dart';
 import '../../core/widgets/avatar_perfil.dart';
 import '../../data/models/usuario.dart';
 import '../../data/models/perfil.dart';
@@ -37,11 +37,18 @@ class _PerfilScreenState extends State<PerfilScreen>
 
   Future<void> _cargar() async {
     setState(() => _cargando = true);
-    final prefs = await SharedPreferences.getInstance();
-    final usuarioId = prefs.getInt('usuarioId');
-    if (usuarioId != null) {
-      _usuario = await _usuarioRepo.obtenerPorId(usuarioId);
-      _perfil = await _perfilRepo.obtenerPorUsuario(usuarioId);
+    final authId = SupabaseService.currentAuthId;
+    if (authId != null) {
+      final data = await SupabaseService.client
+          .from('usuarios')
+          .select('id')
+          .eq('auth_id', authId)
+          .maybeSingle();
+      final usuarioId = data?['id'] as int?;
+      if (usuarioId != null) {
+        _usuario = await _usuarioRepo.obtenerPorId(usuarioId);
+        _perfil = await _perfilRepo.obtenerPorUsuario(usuarioId);
+      }
     }
     if (mounted) setState(() => _cargando = false);
   }

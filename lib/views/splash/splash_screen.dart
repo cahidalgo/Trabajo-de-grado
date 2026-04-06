@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/services/supabase_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -19,26 +19,46 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _redirigir() async {
-    await Future.delayed(const Duration(milliseconds: 1500));
+    // Pequeño delay para mostrar el splash
+    await Future.delayed(const Duration(milliseconds: 1400));
     if (!mounted) return;
-    final prefs = await SharedPreferences.getInstance();
-    final usuarioId = prefs.getInt('usuarioId');
-    final empresaId = prefs.getInt('empresaId');
-    final rolUsuario = prefs.getString('rolUsuario');
-    final onboardingHecho = prefs.getBool('onboarding_completado') ?? false;
-    if (!mounted) return;
-    if (rolUsuario == 'empresa' && empresaId != null) {
-      context.go('/empresa/dashboard');
-    } else if (rolUsuario == 'vendedor' && usuarioId != null) {
-      context.go('/home');
-    } else if (empresaId != null) {
-      context.go('/empresa/dashboard');
-    } else if (usuarioId != null) {
-      context.go('/home');
-    } else if (!onboardingHecho) {
-      context.go('/registro');
-    } else {
+
+    final user = SupabaseService.currentUser;
+
+    if (user == null) {
+      // Sin sesión → onboarding o login
       context.go('/login');
+      return;
+    }
+
+    // Determinar el rol buscando en qué tabla existe el auth_id
+    final db = SupabaseService.client;
+
+    final usuarioData = await db
+        .from('usuarios')
+        .select('id')
+        .eq('auth_id', user.id)
+        .maybeSingle();
+
+    if (usuarioData != null) {
+      if (!mounted) return;
+      context.go('/home');
+      return;
+    }
+
+    final empresaData = await db
+        .from('empresas')
+        .select('id')
+        .eq('auth_id', user.id)
+        .maybeSingle();
+
+    if (!mounted) return;
+    if (empresaData != null) {
+      context.go('/empresa/dashboard');
+    } else {
+      // auth_id no encontrado en ninguna tabla → limpiar sesión
+      await SupabaseService.client.auth.signOut();
+      if (mounted) context.go('/login');
     }
   }
 
@@ -50,8 +70,6 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // ── Logo de la app ──────────────────────────────
-            
             Container(
               width: 120,
               height: 120,
@@ -60,14 +78,15 @@ class _SplashScreenState extends State<SplashScreen> {
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08), // era 0.2
-                    blurRadius: 12,                         // era 20
-                    offset: const Offset(0, 4),             // era (0,8)
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
               padding: const EdgeInsets.all(16),
-              child: Image.asset('assets/icon/icon.png', fit: BoxFit.contain),
+              child: Image.asset('assets/icon/icon.png',
+                  fit: BoxFit.contain),
             ),
             const SizedBox(height: 24),
             const Text(
@@ -86,9 +105,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 48),
             const CircularProgressIndicator(
-              color: Colors.white,
-              strokeWidth: 2,
-            ),
+                color: Colors.white, strokeWidth: 2),
           ],
         ),
       ),

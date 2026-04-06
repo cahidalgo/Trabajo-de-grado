@@ -1,179 +1,173 @@
+import '../../core/services/supabase_service.dart';
 import '../models/vacante_empresa_model.dart';
-import '../database/database_helper.dart';
 
 class VacanteEmpresaRepository {
-  final DatabaseHelper _db = DatabaseHelper();
+  final _db = SupabaseService.client;
 
-  // ── Bug 1 fix: dual-write ─────────────────────────────────────────────────
-  // Inserta en vacantes_empresa Y crea un espejo en vacantes para que los
-  // usuarios puedan verla en la lista principal.
+  // ── Publicar: dual-write atómico ─────────────────────────────
+  // Inserta en vacantes_empresa Y crea un espejo en vacantes para
+  // que el usuario final la vea en su lista de vacantes.
   Future<int> publicarVacante(VacanteEmpresaModel vacante) async {
-    final db = await _db.database;
+    // 1. Obtener nombre de la empresa
+    final empData = await _db
+        .from('empresas')
+        .select('razon_social')
+        .eq('id', vacante.empresaId)
+        .single();
+    final empresaNombre = empData['razon_social'] as String? ?? 'Empresa';
 
-    // 1. Obtener nombre de la empresa para el campo `empresa` de vacantes
-    final empResult = await db.query(
-      'empresas',
-      columns: ['razon_social'],
-      where: 'id = ?',
-      whereArgs: [vacante.empresaId],
-    );
-    final empresaNombre = empResult.isNotEmpty
-        ? empResult.first['razon_social'] as String
-        : 'Empresa';
+    // 2. Insertar espejo en vacantes
+    final vacanteEspejoData = await _db.from('vacantes').insert({
+      'titulo':              vacante.titulo,
+      'descripcion':         vacante.descripcion,
+      'empresa':             empresaNombre,
+      'categoria':           vacante.sector,
+      'modalidad':           vacante.modalidad,
+      'jornada':             vacante.jornada,
+      'salario_referencial': vacante.salarioReferencial,
+      'fecha_cierre':        vacante.fechaCierre,
+      'activa':              vacante.activa,
+    }).select('id').single();
+    final vacanteEspejoId = vacanteEspejoData['id'] as int;
 
-    // 2. Insertar en vacantes_empresa
-    final veId = await db.insert('vacantes_empresa', vacante.toMap());
+    // 3. Insertar en vacantes_empresa con referencia al espejo
+    final veData = await _db.from('vacantes_empresa').insert({
+      ...vacante.toMap(),
+      'vacante_id': vacanteEspejoId,
+    }).select('id').single();
 
-    // 3. Insertar espejo en vacantes (tabla que leen los usuarios)
-    final vacanteEspejoId = await db.insert('vacantes', {
-      'titulo': vacante.titulo,
-      'descripcion': vacante.descripcion,
-      'empresa': empresaNombre,
-      'categoria': vacante.sector,  // sector → categoria
-      'modalidad': vacante.modalidad,
-      'jornada': vacante.jornada,
-      'salarioReferencial': vacante.salarioReferencial,
-      'requisitos': null,
-      'fechaCierre': vacante.fechaCierre,
-      'activa': vacante.activa ? 1 : 0,
-    });
-
-    // 4. Guardar el ID espejo en vacantes_empresa para sincronización futura
-    await db.update(
-      'vacantes_empresa',
-      {'vacante_id': vacanteEspejoId},
-      where: 'id = ?',
-      whereArgs: [veId],
-    );
-
-    return veId;
+    return veData['id'] as int;
   }
 
-  Future<List<VacanteEmpresaModel>> obtenerVacantesPorEmpresa(int empresaId) async {
-    final db = await _db.database;
-    final result = await db.query(
-      'vacantes_empresa',
-      where: 'empresa_id = ?',
-      whereArgs: [empresaId],
-      orderBy: 'fecha_publicacion DESC',
-    );
-    return result.map((e) => VacanteEmpresaModel.fromMap(e)).toList();
+  Future<List<VacanteEmpresaModel>> obtenerVacantesPorEmpresa(
+      int empresaId) async {
+    final data = await _db
+        .from('vacantes_empresa')
+        .select()
+        .eq('empresa_id', empresaId)
+        .order('fecha_publicacion', ascending: false);
+    return (data as List)
+        .map((e) => VacanteEmpresaModel.fromMap(e))
+        .toList();
   }
 
-  // ── Bug 1 fix: sincronizar estado activa en ambas tablas ──────────────────
+  // ── Activar / pausar ──────────────────────────────────────────
   Future<void> pausarVacante(int id) async {
-    final db = await _db.database;
-    await db.update('vacantes_empresa', {'activa': 0},
-        where: 'id = ?', whereArgs: [id]);
-    await _sincronizarActiva(db, id, 0);
+    await _sincronizarActiva(id, false);
   }
 
   Future<void> activarVacante(int id) async {
-    final db = await _db.database;
-    await db.update('vacantes_empresa', {'activa': 1},
-        where: 'id = ?', whereArgs: [id]);
-    await _sincronizarActiva(db, id, 1);
+    await _sincronizarActiva(id, true);
   }
 
-  // ── Bug 1 fix: eliminar de ambas tablas ───────────────────────────────────
-  Future<void> eliminarVacante(int id) async {
-    final db = await _db.database;
-    final vacanteId = await _obtenerVacanteEspejoId(db, id);
-    await db.delete('vacantes_empresa', where: 'id = ?', whereArgs: [id]);
+  Future<void> _sincronizarActiva(int vacanteEmpresaId, bool activa) async {
+    await _db
+        .from('vacantes_empresa')
+        .update({'activa': activa})
+        .eq('id', vacanteEmpresaId);
+
+    final veData = await _db
+        .from('vacantes_empresa')
+        .select('vacante_id')
+        .eq('id', vacanteEmpresaId)
+        .maybeSingle();
+
+    final vacanteId = veData?['vacante_id'] as int?;
     if (vacanteId != null) {
-      await db.delete('vacantes', where: 'id = ?', whereArgs: [vacanteId]);
+      await _db
+          .from('vacantes')
+          .update({'activa': activa})
+          .eq('id', vacanteId);
     }
   }
 
-  // ── Bug 1 fix: actualizar ambas tablas ────────────────────────────────────
+  // ── Eliminar ──────────────────────────────────────────────────
+  Future<void> eliminarVacante(int id) async {
+    final veData = await _db
+        .from('vacantes_empresa')
+        .select('vacante_id')
+        .eq('id', id)
+        .maybeSingle();
+
+    await _db.from('vacantes_empresa').delete().eq('id', id);
+
+    final vacanteId = veData?['vacante_id'] as int?;
+    if (vacanteId != null) {
+      await _db.from('vacantes').delete().eq('id', vacanteId);
+    }
+  }
+
+  // ── Actualizar ────────────────────────────────────────────────
   Future<void> actualizarVacante(VacanteEmpresaModel vacante) async {
-    final db = await _db.database;
-    await db.update(
-      'vacantes_empresa',
-      vacante.toMap(),
-      where: 'id = ?',
-      whereArgs: [vacante.id],
-    );
-    // Sincronizar campos relevantes en el espejo de vacantes
+    final map = vacante.toMap();
+    map.remove('id'); // no enviar id en UPDATE
+    await _db
+        .from('vacantes_empresa')
+        .update(map)
+        .eq('id', vacante.id!);
+
     if (vacante.vacanteId != null) {
-      await db.update(
-        'vacantes',
-        {
-          'titulo': vacante.titulo,
-          'descripcion': vacante.descripcion,
-          'categoria': vacante.sector,
-          'modalidad': vacante.modalidad,
-          'jornada': vacante.jornada,
-          'salarioReferencial': vacante.salarioReferencial,
-          'fechaCierre': vacante.fechaCierre,
-          'activa': vacante.activa ? 1 : 0,
-        },
-        where: 'id = ?',
-        whereArgs: [vacante.vacanteId],
-      );
+      await _db.from('vacantes').update({
+        'titulo':              vacante.titulo,
+        'descripcion':         vacante.descripcion,
+        'categoria':           vacante.sector,
+        'modalidad':           vacante.modalidad,
+        'jornada':             vacante.jornada,
+        'salario_referencial': vacante.salarioReferencial,
+        'fecha_cierre':        vacante.fechaCierre,
+        'activa':              vacante.activa,
+      }).eq('id', vacante.vacanteId!);
     }
   }
 
-  // ── Bug 2 fix: columnas y join corregidos ─────────────────────────────────
-  // La query anterior usaba nombres de columna inexistentes (u.nombre,
-  // u.correo_o_celular, p.usuario_id, p.vacante_id, p.fecha_postulacion).
-  // nivel_educativo está en `perfiles`, no en `usuarios`.
+  // ── Postulantes ───────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> obtenerPostulantesPorVacante(
       int vacanteEmpresaId) async {
-    final db = await _db.database;
-    final vacanteId = await _obtenerVacanteEspejoId(db, vacanteEmpresaId);
+    // Obtener el ID espejo
+    final veData = await _db
+        .from('vacantes_empresa')
+        .select('vacante_id')
+        .eq('id', vacanteEmpresaId)
+        .maybeSingle();
+    final vacanteId = veData?['vacante_id'] as int?;
     if (vacanteId == null) return [];
 
-    return await db.rawQuery('''
-      SELECT
-        p.id                                AS postulacion_id,
-        u.nombreCompleto                    AS nombre,
-        u.correoOTelefono                   AS correo_o_celular,
-        COALESCE(pf.nivelEducativo, '-')    AS nivel_educativo,
-        COALESCE(pf.habilidades, '')        AS habilidades,
-        COALESCE(pf.experienciaLaboral, '') AS experiencia,
-        p.fechaPostulacion                  AS fecha_postulacion,
-        p.estado
-      FROM postulaciones p
-      INNER JOIN usuarios u   ON p.usuarioId  = u.id
-      LEFT  JOIN perfiles  pf ON pf.usuarioId = u.id
-      WHERE p.vacanteId = ?
-      ORDER BY p.fechaPostulacion DESC
-    ''', [vacanteId]);
+    // Join manual: postulaciones → usuarios → perfiles
+    final data = await _db
+        .from('postulaciones')
+        .select('id, fecha_postulacion, estado, usuarios(id, nombre_completo, correo_o_telefono, perfiles(nivel_educativo, habilidades, experiencia_laboral))')
+        .eq('vacante_id', vacanteId)
+        .order('fecha_postulacion', ascending: false);
+
+    return (data as List).map((p) {
+      final u = p['usuarios'] as Map<String, dynamic>? ?? {};
+      final rawPf = u['perfiles'];
+      Map<String, dynamic> pf;
+      if (rawPf is Map<String, dynamic>) {
+        pf = rawPf;
+      } else if (rawPf is List && rawPf.isNotEmpty) {
+        pf = rawPf.first as Map<String, dynamic>;
+      } else {
+        pf = {};
+      }
+      return {
+        'postulacion_id':  p['id'],
+        'nombre':          u['nombre_completo'] ?? 'Sin nombre',
+        'correo_o_celular': u['correo_o_telefono'] ?? '',
+        'nivel_educativo': pf['nivel_educativo'] ?? '-',
+        'habilidades':     pf['habilidades'] ?? '',
+        'experiencia':     pf['experiencia_laboral'] ?? '',
+        'fecha_postulacion': p['fecha_postulacion'] ?? '',
+        'estado':          p['estado'] ?? 'Enviada',
+      };
+    }).toList();
   }
 
   Future<void> actualizarEstadoPostulacion(
       int postulacionId, String estado) async {
-    final db = await _db.database;
-    await db.update(
-      'postulaciones',
-      {'estado': estado},
-      where: 'id = ?',
-      whereArgs: [postulacionId],
-    );
-  }
-
-  // ── Helpers privados ──────────────────────────────────────────────────────
-  Future<int?> _obtenerVacanteEspejoId(dynamic db, int vacanteEmpresaId) async {
-    final result = await db.query(
-      'vacantes_empresa',
-      columns: ['vacante_id'],
-      where: 'id = ?',
-      whereArgs: [vacanteEmpresaId],
-    );
-    if (result.isEmpty) return null;
-    return result.first['vacante_id'] as int?;
-  }
-
-  Future<void> _sincronizarActiva(dynamic db, int vacanteEmpresaId, int activa) async {
-    final vacanteId = await _obtenerVacanteEspejoId(db, vacanteEmpresaId);
-    if (vacanteId != null) {
-      await db.update(
-        'vacantes',
-        {'activa': activa},
-        where: 'id = ?',
-        whereArgs: [vacanteId],
-      );
-    }
+    await _db
+        .from('postulaciones')
+        .update({'estado': estado})
+        .eq('id', postulacionId);
   }
 }

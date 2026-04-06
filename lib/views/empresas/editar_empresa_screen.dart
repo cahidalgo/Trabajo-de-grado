@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'dart:io';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -35,10 +33,6 @@ class _EditarEmpresaScreenState
   bool _verNueva = false;
   bool _verConfirm = false;
   String _passNueva = '';
-
-  // ✅ sha256 — igual que EmpresaRepository._hashPassword
-  String _hash(String pass) =>
-      sha256.convert(utf8.encode(pass)).toString();
 
   // ── Seguridad contraseña ────────────────────────────────────
   int get _nivelSeguridad {
@@ -156,9 +150,6 @@ class _EditarEmpresaScreenState
   }
 
   Future<String?> _validarCambioContrasena() async {
-    if (_passActualCtrl.text.isEmpty) {
-      return 'Ingresa tu contraseña actual';
-    }
     if (_passNuevaCtrl.text.length < 8) {
       return 'La nueva contraseña debe tener mínimo 8 caracteres';
     }
@@ -166,16 +157,10 @@ class _EditarEmpresaScreenState
       return 'Las contraseñas no coinciden';
     }
 
-    final vm = context.read<EmpresaViewModel>();
-    final empresa = vm.empresaActual;
-    if (empresa == null) return 'No se encontró la empresa';
-
-    // ✅ sha256 — igual que el registro y login de empresa
-    if (empresa.contrasenaHash != _hash(_passActualCtrl.text)) {
-      return 'La contraseña actual es incorrecta';
-    }
-
-    await vm.actualizarContrasena(_hash(_passNuevaCtrl.text));
+    // Supabase Auth gestiona la autenticación — no hay contrasenaHash
+    // local. Se actualiza directamente a través de la sesión activa.
+    await context.read<EmpresaViewModel>()
+        .actualizarContrasena(_passNuevaCtrl.text);
     return null;
   }
 
@@ -501,14 +486,6 @@ class _SeccionContrasenaEmpresa extends StatelessWidget {
         ),
         if (abierta) ...[
           const SizedBox(height: 16),
-          _CampoPass(
-            controller: passActualCtrl,
-            label: 'Contraseña actual',
-            hint: 'Ingresa tu contraseña actual',
-            ver: verActual,
-            onToggleVer: onToggleVerActual,
-          ),
-          const SizedBox(height: 12),
           _CampoPass(
             controller: passNuevaCtrl,
             label: 'Nueva contraseña',

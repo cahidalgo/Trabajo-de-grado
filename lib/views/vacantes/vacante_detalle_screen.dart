@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/supabase_service.dart';
 import '../../data/models/vacante.dart';
 import '../../data/repositories/vacante_repository.dart';
 import '../../viewmodels/postulacion_viewmodel.dart';
@@ -31,8 +31,15 @@ class _VacanteDetalleScreenState extends State<VacanteDetalleScreen> {
 
   Future<void> _cargar() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _usuarioId = prefs.getInt('usuarioId');
+      final authId = SupabaseService.currentAuthId;
+      if (authId != null) {
+        final data = await SupabaseService.client
+            .from('usuarios')
+            .select('id')
+            .eq('auth_id', authId)
+            .maybeSingle();
+        _usuarioId = data?['id'] as int?;
+      }
       _vacante = await _repo.obtenerPorId(widget.vacanteId);
       if (_usuarioId != null && _vacante != null) {
         final vm = context.read<PostulacionViewModel>();

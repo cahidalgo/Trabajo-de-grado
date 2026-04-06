@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../core/services/supabase_service.dart';
 import '../data/repositories/postulacion_repository.dart';
 
 enum PostulacionState { idle, loading, exitosa, yaPostulado, error }
@@ -7,17 +7,24 @@ enum PostulacionState { idle, loading, exitosa, yaPostulado, error }
 class PostulacionViewModel extends ChangeNotifier {
   final _repo = PostulacionRepository();
 
-  PostulacionState          _state    = PostulacionState.idle;
+  PostulacionState           _state    = PostulacionState.idle;
   List<Map<String, dynamic>> _historial = [];
-  String?                   _errorMsg;
+  String?                    _errorMsg;
 
   PostulacionState           get state     => _state;
   List<Map<String, dynamic>> get historial => _historial;
   String?                    get errorMsg  => _errorMsg;
 
+  // Obtiene el usuarioId desde la tabla usuarios usando el auth_id actual
   Future<int?> _getUsuarioId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('usuarioId');
+    final authId = SupabaseService.currentAuthId;
+    if (authId == null) return null;
+    final data = await SupabaseService.client
+        .from('usuarios')
+        .select('id')
+        .eq('auth_id', authId)
+        .maybeSingle();
+    return data?['id'] as int?;
   }
 
   Future<bool> verificarYaPostulado(int vacanteId) async {
@@ -47,7 +54,7 @@ class PostulacionViewModel extends ChangeNotifier {
       }
       await _repo.registrar(usuarioId, vacanteId);
       _state = PostulacionState.exitosa;
-    } catch (e) {
+    } catch (_) {
       _errorMsg = 'No se pudo registrar la postulación. Intenta de nuevo.';
       _state    = PostulacionState.error;
     }

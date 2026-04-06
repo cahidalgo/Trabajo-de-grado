@@ -1,16 +1,17 @@
-import '../database/database_helper.dart';
+import '../../core/services/supabase_service.dart';
 import '../models/formacion.dart';
 
 class FormacionRepository {
-  final _db = DatabaseHelper();
+  final _db = SupabaseService.client;
 
   Future<List<Formacion>> obtenerTodas({String? categoria}) async {
-    final db = await _db.database;
+    var query = _db.from('formacion').select();
+
     if (categoria != null) {
-      final result = await db.query('formacion', where: 'categoria = ?', whereArgs: [categoria]);
-      return result.map(Formacion.fromMap).toList();
+      query = query.eq('categoria', categoria);
     }
-    final result = await db.query('formacion');
-    return result.map(Formacion.fromMap).toList();
+
+    final data = await query.order('titulo', ascending: true);
+    return (data as List).map((e) => Formacion.fromMap(e)).toList();
   }
 }

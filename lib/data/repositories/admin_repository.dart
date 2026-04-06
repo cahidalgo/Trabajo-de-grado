@@ -1,108 +1,146 @@
-import 'package:sqflite/sqflite.dart';
-import '../database/database_helper.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/services/supabase_service.dart';
 import '../models/empresa_model.dart';
 
 class AdminRepository {
-  final DatabaseHelper _db = DatabaseHelper();
+  final _db = SupabaseService.client;
 
-  Future<int> _count(Database db, String sql) async {
-    final r = await db.rawQuery(sql);
-    return (r.first.values.first as int?) ?? 0;
-  }
-
-  // ── Estadísticas ──────────────────────────────────────────
+  // ── Estadísticas ──────────────────────────────────────────────
   Future<Map<String, int>> obtenerEstadisticas() async {
-    final db = await _db.database;
+    // En supabase_flutter v2, los conteos se obtienen encadenando
+    // .count(CountOption.exact) — FetchOptions ya no es un parámetro de select().
+    final usuarios = await _db
+        .from('usuarios')
+        .select()
+        .count(CountOption.exact);
+    final empresas = await _db
+        .from('empresas')
+        .select()
+        .count(CountOption.exact);
+    final empresasPend = await _db
+        .from('empresas')
+        .select()
+        .eq('validado', false)
+        .count(CountOption.exact);
+    final totalVac = await _db
+        .from('vacantes_empresa')
+        .select()
+        .count(CountOption.exact);
+    final vacActivas = await _db
+        .from('vacantes_empresa')
+        .select()
+        .eq('activa', true)
+        .count(CountOption.exact);
+    final postulaciones = await _db
+        .from('postulaciones')
+        .select()
+        .count(CountOption.exact);
+
     return {
-      'usuarios': await _count(db, 'SELECT COUNT(*) FROM usuarios'),
-      'empresas': await _count(db, 'SELECT COUNT(*) FROM empresas'),
-      'empresasPendientes':
-          await _count(db, 'SELECT COUNT(*) FROM empresas WHERE validado = 0'),
-      'totalVacantes':
-          await _count(db, 'SELECT COUNT(*) FROM vacantes_empresa'),
-      'vacantesActivas':
-          await _count(db, 'SELECT COUNT(*) FROM vacantes_empresa WHERE activa = 1'),
-      'postulaciones': await _count(db, 'SELECT COUNT(*) FROM postulaciones'),
+      'usuarios':           usuarios.count,
+      'empresas':           empresas.count,
+      'empresasPendientes': empresasPend.count,
+      'totalVacantes':      totalVac.count,
+      'vacantesActivas':    vacActivas.count,
+      'postulaciones':      postulaciones.count,
     };
   }
 
-  // ── Empresas ──────────────────────────────────────────────
+  // ── Empresas ──────────────────────────────────────────────────
   Future<List<EmpresaModel>> listarEmpresas() async {
-    final db = await _db.database;
-    final result =
-        await db.query('empresas', orderBy: 'fecha_registro DESC');
-    return result.map(EmpresaModel.fromMap).toList();
+    final data = await _db
+        .from('empresas')
+        .select()
+        .order('fecha_registro', ascending: false);
+    return data.map(EmpresaModel.fromMap).toList();
   }
 
   Future<void> validarEmpresa(int id) async {
-    final db = await _db.database;
-    await db.update(
-        'empresas', {'validado': 1}, where: 'id = ?', whereArgs: [id]);
+    await _db.from('empresas').update({'validado': true}).eq('id', id);
   }
 
   Future<void> revocarEmpresa(int id) async {
-    final db = await _db.database;
-    await db.update(
-        'empresas', {'validado': 0}, where: 'id = ?', whereArgs: [id]);
+    await _db.from('empresas').update({'validado': false}).eq('id', id);
   }
 
-  // ── Usuarios ──────────────────────────────────────────────
+  // ── Usuarios ──────────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> listarUsuarios() async {
-    final db = await _db.database;
-    return db.rawQuery('''
-      SELECT u.id, u.nombreCompleto, u.correoOTelefono, u.fechaRegistro,
-             COALESCE(p.perfilCompleto, 0) AS perfilCompleto
-      FROM usuarios u
-      LEFT JOIN perfiles p ON p.usuarioId = u.id
-      ORDER BY u.fechaRegistro DESC
-    ''');
+    final data = await _db
+        .from('usuarios')
+        .select('id, nombre_completo, correo_o_telefono, fecha_registro, perfiles(perfil_completo)')
+        .order('fecha_registro', ascending: false);
+
+    return data.map((u) {
+      // perfiles puede venir como Map (1:1) o List (1:many)
+      final raw = u['perfiles'];
+      Map<String, dynamic> pf;
+      if (raw is Map<String, dynamic>) {
+        pf = raw;
+      } else if (raw is List && raw.isNotEmpty) {
+        pf = raw.first as Map<String, dynamic>;
+      } else {
+        pf = {};
+      }
+      return {
+        'id':              u['id'],
+        'nombreCompleto':  u['nombre_completo'],
+        'correoOTelefono': u['correo_o_telefono'],
+        'fechaRegistro':   u['fecha_registro'],
+        'perfilCompleto':  pf['perfil_completo'] == true ? 1 : 0,
+      };
+    }).toList();
   }
 
-  // ── Vacantes empresa ──────────────────────────────────────
+  // ── Vacantes ──────────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> listarVacantesConEmpresa() async {
-    final db = await _db.database;
-    return db.rawQuery('''
-      SELECT ve.id, ve.titulo, ve.sector, ve.modalidad, ve.jornada,
-             ve.activa, ve.fecha_publicacion, ve.fecha_cierre,
-             e.razon_social AS empresa_nombre
-      FROM vacantes_empresa ve
-      INNER JOIN empresas e ON e.id = ve.empresa_id
-      ORDER BY ve.fecha_publicacion DESC
-    ''');
+    final data = await _db
+        .from('vacantes_empresa')
+        .select('id, titulo, sector, modalidad, jornada, activa, fecha_publicacion, fecha_cierre, empresas(razon_social)')
+        .order('fecha_publicacion', ascending: false);
+
+    return data.map((v) {
+      final raw = v['empresas'];
+      Map<String, dynamic> e;
+      if (raw is Map<String, dynamic>) {
+        e = raw;
+      } else if (raw is List && raw.isNotEmpty) {
+        e = raw.first as Map<String, dynamic>;
+      } else {
+        e = {};
+      }
+      return {
+        'id':                v['id'],
+        'titulo':            v['titulo'],
+        'sector':            v['sector'],
+        'modalidad':         v['modalidad'],
+        'jornada':           v['jornada'],
+        'activa':            v['activa'] == true ? 1 : 0,
+        'fecha_publicacion': v['fecha_publicacion'],
+        'fecha_cierre':      v['fecha_cierre'],
+        'empresa_nombre':    e['razon_social'],
+      };
+    }).toList();
   }
 
   Future<void> desactivarVacante(int id) async {
-    final db = await _db.database;
-    await db.update(
-        'vacantes_empresa', {'activa': 0}, where: 'id = ?', whereArgs: [id]);
-    // ✅ Sincronizar espejo en vacantes para que desaparezca de la vista usuario
-    final vacanteId = await _vacanteEspejoId(db, id);
-    if (vacanteId != null) {
-      await db.update(
-          'vacantes', {'activa': 0}, where: 'id = ?', whereArgs: [vacanteId]);
-    }
+    await _db.from('vacantes_empresa').update({'activa': false}).eq('id', id);
+    await _sincronizarActivaVacante(id, false);
   }
 
   Future<void> activarVacante(int id) async {
-    final db = await _db.database;
-    await db.update(
-        'vacantes_empresa', {'activa': 1}, where: 'id = ?', whereArgs: [id]);
-    // ✅ Sincronizar espejo en vacantes para que vuelva a aparecer
-    final vacanteId = await _vacanteEspejoId(db, id);
-    if (vacanteId != null) {
-      await db.update(
-          'vacantes', {'activa': 1}, where: 'id = ?', whereArgs: [vacanteId]);
-    }
+    await _db.from('vacantes_empresa').update({'activa': true}).eq('id', id);
+    await _sincronizarActivaVacante(id, true);
   }
 
-  Future<int?> _vacanteEspejoId(Database db, int vacanteEmpresaId) async {
-    final result = await db.query(
-      'vacantes_empresa',
-      columns: ['vacante_id'],
-      where: 'id = ?',
-      whereArgs: [vacanteEmpresaId],
-    );
-    if (result.isEmpty) return null;
-    return result.first['vacante_id'] as int?;
+  Future<void> _sincronizarActivaVacante(int veId, bool activa) async {
+    final data = await _db
+        .from('vacantes_empresa')
+        .select('vacante_id')
+        .eq('id', veId)
+        .maybeSingle();
+    final vacanteId = data?['vacante_id'] as int?;
+    if (vacanteId != null) {
+      await _db.from('vacantes').update({'activa': activa}).eq('id', vacanteId);
+    }
   }
 }

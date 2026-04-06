@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/supabase_service.dart';
 import '../../core/utils/validators.dart';
 import '../../core/widgets/voice_input_field.dart';
 import '../../data/models/perfil.dart';
@@ -103,15 +103,23 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   }
 
   Future<void> _cargarDatos() async {
-    final prefs = await SharedPreferences.getInstance();
-    _usuarioId = prefs.getInt('usuarioId');
-    if (_usuarioId == null) return;
+    // Obtener usuarioId desde la sesión activa de Supabase
+    final authId = SupabaseService.currentAuthId;
+    if (authId == null) return;
 
-    final usuario = await _usuarioRepo.obtenerPorId(_usuarioId!);
+    final data = await SupabaseService.client
+        .from('usuarios')
+        .select('id, nombre_completo')
+        .eq('auth_id', authId)
+        .maybeSingle();
+
+    if (data == null) return;
+    _usuarioId = data['id'] as int;
+
     final perfil = context.read<PerfilViewModel>().perfil ??
         await _cargarPerfilDirecto(_usuarioId!);
 
-    _nombreCtrl.text = usuario?.nombreCompleto ?? '';
+    _nombreCtrl.text = data['nombre_completo'] as String? ?? '';
     _experienciaCtrl.text = perfil?.experienciaLaboral ?? '';
     _habilidadesCtrl.text = perfil?.habilidades ?? '';
     _nivelEducativo = perfil?.nivelEducativo;
@@ -224,7 +232,6 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
 }
 
   Future<String?> _cambiarContrasena() async {
-    if (_passActualCtrl.text.isEmpty) return 'Ingresa tu contraseña actual';
     if (_passNuevaCtrl.text.length < 8) {
       return 'La nueva contraseña debe tener mínimo 8 caracteres';
     }
@@ -232,21 +239,13 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
       return 'Las contraseñas no coinciden';
     }
 
-    final usuario = await _usuarioRepo.obtenerPorId(_usuarioId!);
-    if (usuario == null) return 'No se encontró el usuario';
-
-    // ✅ sha256 — igual que auth_viewmodel y usuario_repository
-    if (usuario.contrasenaHash != _hash(_passActualCtrl.text)) {
-      return 'La contraseña actual es incorrecta';
-    }
-
-    await _usuarioRepo.actualizarContrasena(
-        _usuarioId!, _hash(_passNuevaCtrl.text));
+    // Supabase Auth gestiona la autenticación — se actualiza
+    // directamente a través de la sesión activa, sin hash local.
+    await _usuarioRepo.actualizarContrasena(_passNuevaCtrl.text);
     return null;
   }
 
-  // ✅ Usa el mismo sha256 del repositorio — NO hashCode
-  String _hash(String pass) => _usuarioRepo.hashContrasena(pass);
+  // Eliminar _hash: ya no hay hashing manual con Supabase Auth
 
   @override
   void dispose() {
@@ -541,14 +540,6 @@ class _SeccionContrasena extends StatelessWidget {
         ),
         if (abierta) ...[
           const SizedBox(height: 16),
-          _CampoPass(
-            controller: passActualCtrl,
-            label: 'Contraseña actual',
-            hint: 'Ingresa tu contraseña actual',
-            ver: verActual,
-            onToggleVer: onToggleVerActual,
-          ),
-          const SizedBox(height: 12),
           _CampoPass(
             controller: passNuevaCtrl,
             label: 'Nueva contraseña',
