@@ -135,15 +135,28 @@ class AdminDashboardScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     LayoutBuilder(
                       builder: (context, constraints) {
-                        final compact = constraints.maxWidth < 360;
+                        const spacing = 14.0;
+                        final crossAxisCount =
+                            constraints.maxWidth < 340 ? 1 : 2;
+                        final itemWidth = (constraints.maxWidth -
+                                (spacing * (crossAxisCount - 1))) /
+                            crossAxisCount;
+                        final mainAxisExtent = crossAxisCount == 1
+                            ? 148.0
+                            : itemWidth < 170
+                                ? 172.0
+                                : 160.0;
 
-                        return GridView.count(
-                          crossAxisCount: 2,
+                        return GridView(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 14,
-                          childAspectRatio: compact ? 1.02 : 1.16,
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: spacing,
+                            mainAxisSpacing: spacing,
+                            mainAxisExtent: mainAxisExtent,
+                          ),
                           children: [
                             _KpiCard(
                               label: 'Usuarios',
@@ -289,7 +302,8 @@ class _KpiCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxHeight < 150;
+        final compact =
+            constraints.maxWidth < 170 || constraints.maxHeight < 160;
 
         return Container(
           decoration: BoxDecoration(
@@ -310,62 +324,61 @@ class _KpiCard extends StatelessWidget {
           padding: EdgeInsets.all(compact ? 14 : 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Icon(
                 icono,
                 color: Colors.white.withOpacity(0.9),
                 size: compact ? 22 : 26,
               ),
-              SizedBox(height: compact ? 10 : 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        '$valor',
-                        style: TextStyle(
-                          fontSize: compact ? 28 : 34,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          height: 1,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              const SizedBox(height: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '$valor',
                       style: TextStyle(
-                        fontSize: compact ? 11 : 12,
-                        color: Colors.white.withOpacity(0.8),
-                        fontWeight: FontWeight.w500,
+                        fontSize: compact ? 28 : 34,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        height: 1,
                       ),
                     ),
-                    if (badge != null) ...[
-                      const SizedBox(height: 6),
-                      _KpiBadge(
-                        text: badge!,
-                        compact: compact,
-                        backgroundColor: badgeGreen
-                            ? Colors.white.withOpacity(0.25)
-                            : Colors.orange.withOpacity(0.85),
-                      ),
-                    ],
-                    if (badgeLabel != null) ...[
-                      const SizedBox(height: 6),
-                      _KpiBadge(
-                        text: badgeLabel!,
-                        compact: compact,
-                        backgroundColor: Colors.white.withOpacity(0.25),
-                      ),
-                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: compact ? 11 : 12,
+                      color: Colors.white.withOpacity(0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (badge != null) ...[
+                    const SizedBox(height: 6),
+                    _KpiBadge(
+                      text: badge!,
+                      compact: compact,
+                      backgroundColor: badgeGreen
+                          ? Colors.white.withOpacity(0.25)
+                          : Colors.orange.withOpacity(0.85),
+                    ),
                   ],
-                ),
+                  if (badgeLabel != null) ...[
+                    const SizedBox(height: 6),
+                    _KpiBadge(
+                      text: badgeLabel!,
+                      compact: compact,
+                      backgroundColor: Colors.white.withOpacity(0.25),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
@@ -399,7 +412,7 @@ class _KpiBadge extends StatelessWidget {
       ),
       child: Text(
         text,
-        maxLines: 1,
+        maxLines: 2,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: compact ? 9 : 10,

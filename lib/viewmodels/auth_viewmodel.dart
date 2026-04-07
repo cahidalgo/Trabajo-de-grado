@@ -15,7 +15,7 @@ enum AuthState {
 }
 
 // ── Credenciales admin (hardcoded para MVP) ───────────────────
-const _kAdminCorreo = 'admin@vendedorestm.com';
+const _kAdminCorreo = 'admin@formalia.com';
 const _kAdminContrasena = 'Admin123*';
 
 class AuthViewModel extends ChangeNotifier {
@@ -77,54 +77,80 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     final input = correoOTelefono.trim();
+    final db = SupabaseService.client;
 
     try {
-      // 1. Admin hardcoded — also authenticate with Supabase for RLS
-      if (input == _kAdminCorreo && contrasena == _kAdminContrasena) {
-        // Intentar autenticar en Supabase (el admin debe existir en auth.users)
-        try {
-          await SupabaseService.client.auth.signInWithPassword(
-            email: _kAdminCorreo,
-            password: _kAdminContrasena,
-          );
-        } catch (_) {
-          // Si no existe en Supabase Auth, continuar sin sesión
-        }
+      // ── 1. Construir el email para Supabase Auth ───────────────
+      // Los vendedores registrados con teléfono usan email sintético
+      String authEmail = input;
+      if (!input.contains('@')) {
+        authEmail = '$input@formalia.co';
+      }
+
+      // ── 2. Autenticar UNA sola vez ─────────────────────────────
+      final AuthResponse res;
+      try {
+        res = await db.auth.signInWithPassword(
+          email: authEmail,
+          password: contrasena,
+        );
+      } on AuthException {
+        // Si falla con email directo y el input era un teléfono,
+        // ya no hay más que intentar
+        _errorMsg = 'Correo/celular o contraseña incorrectos.';
+        _state    = AuthState.error;
+        notifyListeners();
+        return;
+      }
+
+      if (res.user == null) {
+        _errorMsg = 'Correo/celular o contraseña incorrectos.';
+        _state    = AuthState.error;
+        notifyListeners();
+        return;
+      }
+
+      final authId = res.user!.id;
+      final email  = res.user!.email;
+
+      // ── 3. Determinar el rol consultando las tablas ────────────
+      // Admin (por email)
+      if (email == _kAdminCorreo) {
         _state = AuthState.loginAdmin;
         notifyListeners();
         return;
       }
 
-      // 2. Intentar como vendedor
-      final usuario = await _repo.login(input, contrasena);
-      if (usuario != null) {
-        _usuarioIdActual = usuario.id;
+      // ¿Es vendedor?
+      final usuarioData = await db
+          .from('usuarios')
+          .select('id')
+          .eq('auth_id', authId)
+          .maybeSingle();
+
+      if (usuarioData != null) {
+        _usuarioIdActual = usuarioData['id'] as int;
         _state = AuthState.loginExitoso;
         notifyListeners();
         return;
       }
 
-      // Si el login de vendedor retornó null (email autenticó pero no
-      // está en tabla usuarios), cerrar la sesión antes de continuar.
-      if (SupabaseService.currentUser != null) {
-        await SupabaseService.client.auth.signOut();
+      // ¿Es empresa?
+      final empresaData = await db
+          .from('empresas')
+          .select('id')
+          .eq('auth_id', authId)
+          .maybeSingle();
+
+      if (empresaData != null) {
+        _state = AuthState.loginEmpresa;
+        notifyListeners();
+        return;
       }
 
-      // 3. Intentar como empresa (solo si parece email)
-      if (input.contains('@')) {
-        final empresa = await _empresaRepo.login(input, contrasena);
-        if (empresa != null) {
-          _state = AuthState.loginEmpresa;
-          notifyListeners();
-          return;
-        }
-        if (SupabaseService.currentUser != null) {
-          await SupabaseService.client.auth.signOut();
-        }
-      }
-
-      // 4. No encontrado
-      _errorMsg = 'Correo/celular o contraseña incorrectos.';
+      // Auth exitoso pero no está en ninguna tabla → limpiar sesión
+      await db.auth.signOut();
+      _errorMsg = 'Cuenta no encontrada. Contacta soporte.';
       _state    = AuthState.error;
     } on AuthException catch (e) {
       _errorMsg = e.message;
@@ -141,6 +167,11 @@ class AuthViewModel extends ChangeNotifier {
   Future<String?> restaurarSesion() async {
     final user = SupabaseService.currentUser;
     if (user == null) return null;
+
+    // Verificar si es admin por email
+    if (user.email == _kAdminCorreo) {
+      return 'admin';
+    }
 
     // Verificar si es vendedor
     final usuarioData = await SupabaseService.client
