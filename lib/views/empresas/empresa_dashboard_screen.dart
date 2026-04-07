@@ -1,10 +1,12 @@
+// empresa_dashboard_screen.dart — ARCHIVO COMPLETO
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/app_ui.dart';
-import '../../core/widgets/avatar_perfil.dart';
 import '../../data/models/empresa_model.dart';
 import '../../viewmodels/empresa_viewmodel.dart';
 import '../../viewmodels/vacante_empresa_viewmodel.dart';
@@ -121,21 +123,122 @@ class _EmpresaDashboardScreenState extends State<EmpresaDashboardScreen> {
   }
 }
 
-// ── Pestaña "Mi empresa" ──────────────────────────────────────────────────────
-class _PerfilEmpresaResumen extends StatelessWidget {
+// ── Pestaña "Mi empresa" — ahora StatefulWidget para manejar foto ─────────────
+class _PerfilEmpresaResumen extends StatefulWidget {
   final EmpresaModel empresa;
   const _PerfilEmpresaResumen({required this.empresa});
 
+  @override
+  State<_PerfilEmpresaResumen> createState() => _PerfilEmpresaResumenState();
+}
+
+class _PerfilEmpresaResumenState extends State<_PerfilEmpresaResumen> {
+  final _picker = ImagePicker();
+
   String _iniciales() {
-    final partes = empresa.razonSocial.trim().split(' ');
+    final partes = widget.empresa.razonSocial.trim().split(' ');
     if (partes.length >= 2) {
       return '${partes[0][0]}${partes[1][0]}'.toUpperCase();
     }
-    return empresa.razonSocial[0].toUpperCase();
+    return widget.empresa.razonSocial[0].toUpperCase();
+  }
+
+  void _mostrarOpcionesFoto() {
+    final empresa = widget.empresa;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+              const Text('Cambiar foto de perfil',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFE3F2FD),
+                  child: Icon(Icons.camera_alt_outlined, color: AppColors.primary),
+                ),
+                title: const Text('Tomar foto'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _seleccionarFoto(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFE3F2FD),
+                  child: Icon(Icons.photo_library_outlined, color: AppColors.primary),
+                ),
+                title: const Text('Elegir de la galería'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _seleccionarFoto(ImageSource.gallery);
+                },
+              ),
+              if (empresa.fotoPerfil != null && empresa.fotoPerfil!.isNotEmpty)
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFFFFEBEE),
+                    child: Icon(Icons.delete_outline, color: AppColors.error),
+                  ),
+                  title: const Text('Eliminar foto',
+                      style: TextStyle(color: AppColors.error)),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await context.read<EmpresaViewModel>().actualizarFoto('');
+                    if (mounted) setState(() {});
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _seleccionarFoto(ImageSource fuente) async {
+    try {
+      final picked = await _picker.pickImage(
+        source: fuente,
+        imageQuality: 75,
+        maxWidth: 512,
+        maxHeight: 512,
+      );
+      if (picked == null) return;
+
+      await context.read<EmpresaViewModel>().actualizarFoto(picked.path);
+      if (mounted) setState(() {});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo acceder a la cámara o galería. Revisa los permisos.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final empresa = context.watch<EmpresaViewModel>().empresaActual ?? widget.empresa;
+    final tieneFoto = empresa.fotoPerfil != null &&
+        empresa.fotoPerfil!.isNotEmpty &&
+        File(empresa.fotoPerfil!).existsSync();
+
     return RefreshIndicator(
       onRefresh: () =>
           context.read<EmpresaViewModel>().restaurarSesion(),
@@ -155,44 +258,45 @@ class _PerfilEmpresaResumen extends StatelessWidget {
                   vertical: 28, horizontal: 20),
               child: Column(
                 children: [
-                  // Avatar empresa con foto editable
-                  Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      CircleAvatar(
-                        radius: 46,
-                        backgroundColor:
-                            Colors.white.withOpacity(0.2),
-                        backgroundImage: empresa.fotoPerfil != null
-                            ? FileImage(File(empresa.fotoPerfil!))
-                            : null,
-                        child: empresa.fotoPerfil == null
-                            ? Text(
-                                _iniciales(),
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : null,
-                      ),
-                      GestureDetector(
-                        onTap: () async {
-                          await context.push('/empresa/editar');
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.camera_alt,
-                              size: 16,
-                              color: AppColors.primary),
+                  // Avatar empresa con foto editable directamente
+                  GestureDetector(
+                    onTap: _mostrarOpcionesFoto,
+                    child: Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        CircleAvatar(
+                          radius: 46,
+                          backgroundColor:
+                              Colors.white.withOpacity(0.2),
+                          backgroundImage: tieneFoto
+                              ? FileImage(File(empresa.fotoPerfil!))
+                              : null,
+                          child: !tieneFoto
+                              ? Text(
+                                  _iniciales(),
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : null,
                         ),
-                      ),
-                    ],
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: Icon(
+                            tieneFoto ? Icons.edit : Icons.add_a_photo_outlined,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -256,7 +360,6 @@ class _PerfilEmpresaResumen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Descripción si existe
                   if ((empresa.descripcion ?? '').isNotEmpty) ...[
                     _SeccionTitulo(
                         titulo: 'Sobre la empresa',
@@ -265,7 +368,6 @@ class _PerfilEmpresaResumen extends StatelessWidget {
                     const SizedBox(height: 16),
                   ],
 
-                  // Datos registrados
                   _SeccionTitulo(
                     titulo: 'Información registrada',
                     icono: Icons.badge_outlined,
@@ -273,7 +375,6 @@ class _PerfilEmpresaResumen extends StatelessWidget {
                   _TarjetaDatos(empresa: empresa),
                   const SizedBox(height: 16),
 
-                  // Banner validación
                   AppInfoBanner(
                     title: empresa.validado
                         ? 'Cuenta validada'
@@ -290,7 +391,6 @@ class _PerfilEmpresaResumen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // Botón editar
                   ElevatedButton.icon(
                     onPressed: () =>
                         context.push('/empresa/editar'),
@@ -311,7 +411,7 @@ class _PerfilEmpresaResumen extends StatelessWidget {
   }
 }
 
-// ── Widgets auxiliares ────────────────────────────────────────────────────────
+// ── Widgets auxiliares (sin cambios) ──────────────────────────────────────────
 class _SeccionTitulo extends StatelessWidget {
   final String titulo;
   final IconData icono;
