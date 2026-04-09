@@ -23,7 +23,8 @@ class AvatarPerfil extends StatefulWidget {
 }
 
 class _AvatarPerfilState extends State<AvatarPerfil> {
-  String? _fotoPath;
+  String? _fotoUrl;
+  bool _cargando = false;
 
   @override
   void initState() {
@@ -32,8 +33,25 @@ class _AvatarPerfilState extends State<AvatarPerfil> {
   }
 
   Future<void> _cargarFoto() async {
-    final ruta = await FotoPerfilService.obtenerRuta();
-    if (mounted) setState(() => _fotoPath = ruta);
+    final url = await FotoPerfilService.obtenerUrl();
+    if (mounted) setState(() => _fotoUrl = url);
+  }
+
+  /// Determina si la ruta es una URL de red o un path local
+  bool get _esUrl => _fotoUrl != null && _fotoUrl!.startsWith('http');
+
+  /// Determina si tiene una foto válida
+  bool get _tieneFoto {
+    if (_fotoUrl == null) return false;
+    if (_esUrl) return true;
+    // Legacy: path local (por si quedan fotos antiguas)
+    return File(_fotoUrl!).existsSync();
+  }
+
+  ImageProvider? get _imageProvider {
+    if (!_tieneFoto) return null;
+    if (_esUrl) return NetworkImage(_fotoUrl!);
+    return FileImage(File(_fotoUrl!));
   }
 
   void _mostrarOpciones() {
@@ -79,7 +97,7 @@ class _AvatarPerfilState extends State<AvatarPerfil> {
                   await _seleccionar(ImageSource.gallery);
                 },
               ),
-              if (_fotoPath != null)
+              if (_tieneFoto)
                 ListTile(
                   leading: const CircleAvatar(
                     backgroundColor: Color(0xFFFFEBEE),
@@ -89,8 +107,8 @@ class _AvatarPerfilState extends State<AvatarPerfil> {
                       style: TextStyle(color: AppColors.error)),
                   onTap: () async {
                     Navigator.pop(context);
-                    await FotoPerfilService.eliminarFoto();
-                    if (mounted) setState(() => _fotoPath = null);
+                    await FotoPerfilService.eliminar();
+                    if (mounted) setState(() => _fotoUrl = null);
                   },
                 ),
             ],
@@ -102,13 +120,20 @@ class _AvatarPerfilState extends State<AvatarPerfil> {
 
   Future<void> _seleccionar(ImageSource fuente) async {
     try {
-      final ruta = await FotoPerfilService.seleccionarFoto(fuente);
-      if (ruta != null && mounted) {
-        setState(() => _fotoPath = ruta);
-        widget.onFotoCambiada?.call(ruta);
+      setState(() => _cargando = true);
+      final url = await FotoPerfilService.seleccionarYSubir(fuente);
+      if (url != null && mounted) {
+        setState(() {
+          _fotoUrl = url;
+          _cargando = false;
+        });
+        widget.onFotoCambiada?.call(url);
+      } else {
+        if (mounted) setState(() => _cargando = false);
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _cargando = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('No se pudo acceder a la cámara o galería. Revisa los permisos.'),
@@ -121,8 +146,6 @@ class _AvatarPerfilState extends State<AvatarPerfil> {
 
   @override
   Widget build(BuildContext context) {
-    final tienefoto = _fotoPath != null && File(_fotoPath!).existsSync();
-
     return Stack(
       alignment: Alignment.bottomRight,
       children: [
@@ -130,19 +153,24 @@ class _AvatarPerfilState extends State<AvatarPerfil> {
         CircleAvatar(
           radius: widget.radius,
           backgroundColor: Colors.white.withOpacity(0.2),
-          backgroundImage: tienefoto
-              ? FileImage(File(_fotoPath!)) as ImageProvider
-              : null,
-          child: tienefoto
-              ? null
-              : Text(
-                  widget.iniciales,
-                  style: TextStyle(
-                    fontSize: widget.radius * 0.65,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+          backgroundImage: _imageProvider,
+          child: _cargando
+              ? SizedBox(
+                  width: widget.radius * 0.6,
+                  height: widget.radius * 0.6,
+                  child: const CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2),
+                )
+              : !_tieneFoto
+                  ? Text(
+                      widget.iniciales,
+                      style: TextStyle(
+                        fontSize: widget.radius * 0.65,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    )
+                  : null,
         ),
 
         // ── Botón editar (solo si es editable) ─────────────────────
@@ -157,7 +185,7 @@ class _AvatarPerfilState extends State<AvatarPerfil> {
                 border: Border.all(color: Colors.white, width: 2),
               ),
               child: Icon(
-                tienefoto ? Icons.edit : Icons.add_a_photo_outlined,
+                _tieneFoto ? Icons.edit : Icons.add_a_photo_outlined,
                 size: widget.radius * 0.35,
                 color: Colors.white,
               ),

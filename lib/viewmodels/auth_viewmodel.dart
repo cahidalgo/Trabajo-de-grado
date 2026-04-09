@@ -14,10 +14,6 @@ enum AuthState {
   error,
 }
 
-// ── Credenciales admin (hardcoded para MVP) ───────────────────
-const _kAdminCorreo = 'admin@formalia.com';
-const _kAdminContrasena = 'Admin123*';
-
 class AuthViewModel extends ChangeNotifier {
   final _repo       = UsuarioRepository();
   final _empresaRepo = EmpresaRepository();
@@ -29,6 +25,16 @@ class AuthViewModel extends ChangeNotifier {
   AuthState get state     => _state;
   String?   get errorMsg  => _errorMsg;
   int?      get usuarioId => _usuarioIdActual;
+
+  // ── Helper: consultar si un auth_id es admin ──────────────────
+  static Future<bool> _esAdmin(String authId) async {
+    final data = await SupabaseService.client
+        .from('admins')
+        .select('id')
+        .eq('auth_id', authId)
+        .maybeSingle();
+    return data != null;
+  }
 
   // ── Registro vendedor ─────────────────────────────────────────
   Future<void> registrar({
@@ -81,7 +87,6 @@ class AuthViewModel extends ChangeNotifier {
 
     try {
       // ── 1. Construir el email para Supabase Auth ───────────────
-      // Los vendedores registrados con teléfono usan email sintético
       String authEmail = input;
       if (!input.contains('@')) {
         authEmail = '$input@formalia.co';
@@ -95,8 +100,6 @@ class AuthViewModel extends ChangeNotifier {
           password: contrasena,
         );
       } on AuthException {
-        // Si falla con email directo y el input era un teléfono,
-        // ya no hay más que intentar
         _errorMsg = 'Correo/celular o contraseña incorrectos.';
         _state    = AuthState.error;
         notifyListeners();
@@ -111,11 +114,10 @@ class AuthViewModel extends ChangeNotifier {
       }
 
       final authId = res.user!.id;
-      final email  = res.user!.email;
 
       // ── 3. Determinar el rol consultando las tablas ────────────
-      // Admin (por email)
-      if (email == _kAdminCorreo) {
+      // ¿Es admin? (consulta tabla admins)
+      if (await _esAdmin(authId)) {
         _state = AuthState.loginAdmin;
         notifyListeners();
         return;
@@ -163,17 +165,14 @@ class AuthViewModel extends ChangeNotifier {
   }
 
   // ── Restaurar sesión desde Supabase Auth ──────────────────────
-  // Devuelve 'vendedor', 'empresa', 'admin' o null
   Future<String?> restaurarSesion() async {
     final user = SupabaseService.currentUser;
     if (user == null) return null;
 
-    // Verificar si es admin por email
-    if (user.email == _kAdminCorreo) {
-      return 'admin';
-    }
+    // ¿Es admin?
+    if (await _esAdmin(user.id)) return 'admin';
 
-    // Verificar si es vendedor
+    // ¿Es vendedor?
     final usuarioData = await SupabaseService.client
         .from('usuarios')
         .select('id')
@@ -184,7 +183,7 @@ class AuthViewModel extends ChangeNotifier {
       return 'vendedor';
     }
 
-    // Verificar si es empresa
+    // ¿Es empresa?
     final empresaData = await SupabaseService.client
         .from('empresas')
         .select('id')

@@ -19,21 +19,32 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _redirigir() async {
-    // Pequeño delay para mostrar el splash
     await Future.delayed(const Duration(milliseconds: 1400));
     if (!mounted) return;
 
     final user = SupabaseService.currentUser;
 
     if (user == null) {
-      // Sin sesión → onboarding o login
       context.go('/login');
       return;
     }
 
-    // Determinar el rol buscando en qué tabla existe el auth_id
     final db = SupabaseService.client;
 
+    // ¿Es admin? (consulta tabla admins)
+    final adminData = await db
+        .from('admins')
+        .select('id')
+        .eq('auth_id', user.id)
+        .maybeSingle();
+
+    if (adminData != null) {
+      if (!mounted) return;
+      context.go('/admin');
+      return;
+    }
+
+    // ¿Es vendedor?
     final usuarioData = await db
         .from('usuarios')
         .select('id')
@@ -46,6 +57,7 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
 
+    // ¿Es empresa?
     final empresaData = await db
         .from('empresas')
         .select('id')
@@ -56,7 +68,6 @@ class _SplashScreenState extends State<SplashScreen> {
     if (empresaData != null) {
       context.go('/empresa/dashboard');
     } else {
-      // auth_id no encontrado en ninguna tabla → limpiar sesión
       await SupabaseService.client.auth.signOut();
       if (mounted) context.go('/login');
     }

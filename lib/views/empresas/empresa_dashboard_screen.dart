@@ -1,5 +1,3 @@
-// empresa_dashboard_screen.dart — ARCHIVO COMPLETO
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -123,7 +121,17 @@ class _EmpresaDashboardScreenState extends State<EmpresaDashboardScreen> {
   }
 }
 
-// ── Pestaña "Mi empresa" — ahora StatefulWidget para manejar foto ─────────────
+// ── Helper para resolver imagen (URL o path local legacy) ─────────────────────
+ImageProvider? _resolverImagen(String? foto) {
+  if (foto == null || foto.isEmpty) return null;
+  if (foto.startsWith('http')) return NetworkImage(foto);
+  if (File(foto).existsSync()) return FileImage(File(foto));
+  return null;
+}
+
+bool _tieneFoto(String? foto) => _resolverImagen(foto) != null;
+
+// ── Pestaña "Mi empresa" ──────────────────────────────────────────────────────
 class _PerfilEmpresaResumen extends StatefulWidget {
   final EmpresaModel empresa;
   const _PerfilEmpresaResumen({required this.empresa});
@@ -187,7 +195,7 @@ class _PerfilEmpresaResumenState extends State<_PerfilEmpresaResumen> {
                   _seleccionarFoto(ImageSource.gallery);
                 },
               ),
-              if (empresa.fotoPerfil != null && empresa.fotoPerfil!.isNotEmpty)
+              if (_tieneFoto(empresa.fotoPerfil))
                 ListTile(
                   leading: const CircleAvatar(
                     backgroundColor: Color(0xFFFFEBEE),
@@ -235,16 +243,14 @@ class _PerfilEmpresaResumenState extends State<_PerfilEmpresaResumen> {
   @override
   Widget build(BuildContext context) {
     final empresa = context.watch<EmpresaViewModel>().empresaActual ?? widget.empresa;
-    final tieneFoto = empresa.fotoPerfil != null &&
-        empresa.fotoPerfil!.isNotEmpty &&
-        File(empresa.fotoPerfil!).existsSync();
+    final fotoProvider = _resolverImagen(empresa.fotoPerfil);
+    final hayFoto = fotoProvider != null;
 
     return RefreshIndicator(
       onRefresh: () =>
           context.read<EmpresaViewModel>().restaurarSesion(),
       child: CustomScrollView(
         slivers: [
-          // ── Header con foto ──────────────────────────────────
           SliverToBoxAdapter(
             child: Container(
               decoration: const BoxDecoration(
@@ -258,7 +264,6 @@ class _PerfilEmpresaResumenState extends State<_PerfilEmpresaResumen> {
                   vertical: 28, horizontal: 20),
               child: Column(
                 children: [
-                  // Avatar empresa con foto editable directamente
                   GestureDetector(
                     onTap: _mostrarOpcionesFoto,
                     child: Stack(
@@ -268,10 +273,8 @@ class _PerfilEmpresaResumenState extends State<_PerfilEmpresaResumen> {
                           radius: 46,
                           backgroundColor:
                               Colors.white.withOpacity(0.2),
-                          backgroundImage: tieneFoto
-                              ? FileImage(File(empresa.fotoPerfil!))
-                              : null,
-                          child: !tieneFoto
+                          backgroundImage: fotoProvider,
+                          child: !hayFoto
                               ? Text(
                                   _iniciales(),
                                   style: const TextStyle(
@@ -290,7 +293,7 @@ class _PerfilEmpresaResumenState extends State<_PerfilEmpresaResumen> {
                             border: Border.all(color: Colors.white, width: 2),
                           ),
                           child: Icon(
-                            tieneFoto ? Icons.edit : Icons.add_a_photo_outlined,
+                            hayFoto ? Icons.edit : Icons.add_a_photo_outlined,
                             size: 16,
                             color: Colors.white,
                           ),
@@ -353,7 +356,6 @@ class _PerfilEmpresaResumenState extends State<_PerfilEmpresaResumen> {
             ),
           ),
 
-          // ── Contenido ────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -411,7 +413,7 @@ class _PerfilEmpresaResumenState extends State<_PerfilEmpresaResumen> {
   }
 }
 
-// ── Widgets auxiliares (sin cambios) ──────────────────────────────────────────
+// ── Widgets auxiliares ────────────────────────────────────────────────────────
 class _SeccionTitulo extends StatelessWidget {
   final String titulo;
   final IconData icono;

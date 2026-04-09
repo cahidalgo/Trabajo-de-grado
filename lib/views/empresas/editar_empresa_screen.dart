@@ -22,7 +22,10 @@ class _EditarEmpresaScreenState
   final _telefonoCtrl = TextEditingController();
   final _descripcionCtrl = TextEditingController();
   bool _guardando = false;
-  String? _fotoLocal;
+
+  // foto puede ser URL (existente) o path local (recién seleccionada)
+  String? _foto;
+  bool _fotoCambiada = false;
 
   // ── Cambio de contraseña ────────────────────────────────────
   final _passActualCtrl = TextEditingController();
@@ -34,13 +37,12 @@ class _EditarEmpresaScreenState
   bool _verConfirm = false;
   String _passNueva = '';
 
-  // ── Seguridad contraseña ────────────────────────────────────
   int get _nivelSeguridad {
     int n = 0;
     if (_passNueva.length >= 8) n++;
     if (_passNueva.contains(RegExp(r'[A-Z]'))) n++;
     if (_passNueva.contains(RegExp(r'[0-9]'))) n++;
-    if (_passNueva.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-]'))) n++;
+    if (_passNueva.contains(RegExp(r'[!@#\$%^&*(),.?\":{}|<>_\-]'))) n++;
     return n;
   }
 
@@ -72,7 +74,7 @@ class _EditarEmpresaScreenState
       _nombreCtrl.text = empresa.razonSocial;
       _telefonoCtrl.text = empresa.telefono ?? '';
       _descripcionCtrl.text = empresa.descripcion ?? '';
-      _fotoLocal = empresa.fotoPerfil;
+      _foto = empresa.fotoPerfil;
     }
   }
 
@@ -96,6 +98,18 @@ class _EditarEmpresaScreenState
     }
     return nombre[0].toUpperCase();
   }
+
+  // ── Resolver imagen (URL o path local) ──────────────────────
+  bool get _esUrl => _foto != null && _foto!.startsWith('http');
+
+  ImageProvider? get _imageProvider {
+    if (_foto == null || _foto!.isEmpty) return null;
+    if (_esUrl) return NetworkImage(_foto!);
+    if (File(_foto!).existsSync()) return FileImage(File(_foto!));
+    return null;
+  }
+
+  bool get _tieneFoto => _imageProvider != null;
 
   Future<void> _seleccionarFoto() async {
     showModalBottomSheet(
@@ -125,7 +139,7 @@ class _EditarEmpresaScreenState
                 _tomarFoto(ImageSource.gallery);
               },
             ),
-            if (_fotoLocal != null)
+            if (_tieneFoto)
               ListTile(
                 leading: const Icon(Icons.delete_outline,
                     color: AppColors.error),
@@ -133,7 +147,10 @@ class _EditarEmpresaScreenState
                     style: TextStyle(color: AppColors.error)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  setState(() => _fotoLocal = null);
+                  setState(() {
+                    _foto = null;
+                    _fotoCambiada = true;
+                  });
                 },
               ),
           ],
@@ -146,7 +163,12 @@ class _EditarEmpresaScreenState
     final picker = ImagePicker();
     final picked =
         await picker.pickImage(source: source, imageQuality: 80);
-    if (picked != null) setState(() => _fotoLocal = picked.path);
+    if (picked != null) {
+      setState(() {
+        _foto = picked.path;
+        _fotoCambiada = true;
+      });
+    }
   }
 
   Future<String?> _validarCambioContrasena() async {
@@ -157,8 +179,6 @@ class _EditarEmpresaScreenState
       return 'Las contraseñas no coinciden';
     }
 
-    // Supabase Auth gestiona la autenticación — no hay contrasenaHash
-    // local. Se actualiza directamente a través de la sesión activa.
     await context.read<EmpresaViewModel>()
         .actualizarContrasena(_passNuevaCtrl.text);
     return null;
@@ -203,8 +223,9 @@ class _EditarEmpresaScreenState
     setState(() => _guardando = true);
     final vm = context.read<EmpresaViewModel>();
 
-    if (_fotoLocal != vm.empresaActual?.fotoPerfil) {
-      await vm.actualizarFoto(_fotoLocal ?? '');
+    // Solo subir foto si cambió
+    if (_fotoCambiada) {
+      await vm.actualizarFoto(_foto ?? '');
     }
 
     await vm.actualizarPerfil(
@@ -275,10 +296,8 @@ class _EditarEmpresaScreenState
                             radius: 50,
                             backgroundColor:
                                 AppColors.primary.withOpacity(0.15),
-                            backgroundImage: _fotoLocal != null
-                                ? FileImage(File(_fotoLocal!))
-                                : null,
-                            child: _fotoLocal == null
+                            backgroundImage: _imageProvider,
+                            child: !_tieneFoto
                                 ? Text(
                                     _iniciales(),
                                     style: const TextStyle(
@@ -312,7 +331,6 @@ class _EditarEmpresaScreenState
               ),
               const SizedBox(height: 28),
 
-              // ── Datos de la empresa ──────────────────────────
               const _Subtitulo('Datos de la empresa'),
               const SizedBox(height: 12),
 
@@ -372,7 +390,6 @@ class _EditarEmpresaScreenState
               ),
               const SizedBox(height: 32),
 
-              // ── Botón guardar ────────────────────────────────
               ElevatedButton.icon(
                 onPressed: _guardando ? null : _guardar,
                 icon: _guardando
@@ -394,19 +411,15 @@ class _EditarEmpresaScreenState
   }
 }
 
-// ── Sección colapsable contraseña empresa ────────────────────────────────────
+// ── Widgets auxiliares (sin cambios) ──────────────────────────────────────────
 class _SeccionContrasenaEmpresa extends StatelessWidget {
   final bool abierta;
   final VoidCallback onToggle;
   final TextEditingController passActualCtrl;
   final TextEditingController passNuevaCtrl;
   final TextEditingController passConfirmCtrl;
-  final bool verActual;
-  final bool verNueva;
-  final bool verConfirm;
-  final VoidCallback onToggleVerActual;
-  final VoidCallback onToggleVerNueva;
-  final VoidCallback onToggleVerConfirm;
+  final bool verActual, verNueva, verConfirm;
+  final VoidCallback onToggleVerActual, onToggleVerNueva, onToggleVerConfirm;
   final String passNueva;
   final int nivelSeguridad;
   final String textoSeguridad;
@@ -414,21 +427,14 @@ class _SeccionContrasenaEmpresa extends StatelessWidget {
   final ValueChanged<String> onPassNuevaChanged;
 
   const _SeccionContrasenaEmpresa({
-    required this.abierta,
-    required this.onToggle,
-    required this.passActualCtrl,
-    required this.passNuevaCtrl,
+    required this.abierta, required this.onToggle,
+    required this.passActualCtrl, required this.passNuevaCtrl,
     required this.passConfirmCtrl,
-    required this.verActual,
-    required this.verNueva,
-    required this.verConfirm,
-    required this.onToggleVerActual,
-    required this.onToggleVerNueva,
+    required this.verActual, required this.verNueva, required this.verConfirm,
+    required this.onToggleVerActual, required this.onToggleVerNueva,
     required this.onToggleVerConfirm,
-    required this.passNueva,
-    required this.nivelSeguridad,
-    required this.textoSeguridad,
-    required this.colorSeguridad,
+    required this.passNueva, required this.nivelSeguridad,
+    required this.textoSeguridad, required this.colorSeguridad,
     required this.onPassNuevaChanged,
   });
 
@@ -441,106 +447,58 @@ class _SeccionContrasenaEmpresa extends StatelessWidget {
           onTap: onToggle,
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: abierta
-                  ? AppColors.primaryLight
-                  : const Color(0xFFF5F5F5),
+              color: abierta ? AppColors.primaryLight : const Color(0xFFF5F5F5),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: abierta
-                    ? AppColors.primary.withOpacity(0.4)
-                    : AppColors.border,
+                color: abierta ? AppColors.primary.withOpacity(0.4) : AppColors.border,
               ),
             ),
             child: Row(
               children: [
                 Icon(Icons.lock_outline,
-                    color: abierta
-                        ? AppColors.primary
-                        : AppColors.textSecondary,
-                    size: 20),
+                    color: abierta ? AppColors.primary : AppColors.textSecondary, size: 20),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    'Cambiar contraseña',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: abierta
-                          ? AppColors.primary
-                          : AppColors.textPrimary,
-                    ),
-                  ),
+                  child: Text('Cambiar contraseña',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600,
+                      color: abierta ? AppColors.primary : AppColors.textPrimary)),
                 ),
-                Icon(
-                  abierta
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
-                  color: AppColors.textSecondary,
-                ),
+                Icon(abierta ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    color: AppColors.textSecondary),
               ],
             ),
           ),
         ),
         if (abierta) ...[
           const SizedBox(height: 16),
-          _CampoPass(
-            controller: passNuevaCtrl,
-            label: 'Nueva contraseña',
+          _CampoPass(controller: passNuevaCtrl, label: 'Nueva contraseña',
             hint: 'Mín. 8 caracteres, 1 mayúscula, 1 número',
-            ver: verNueva,
-            onToggleVer: onToggleVerNueva,
-            onChanged: onPassNuevaChanged,
-          ),
+            ver: verNueva, onToggleVer: onToggleVerNueva,
+            onChanged: onPassNuevaChanged),
           if (passNueva.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Row(
-              children: List.generate(4, (i) => Expanded(
-                child: Container(
-                  margin: EdgeInsets.only(right: i < 3 ? 4 : 0),
-                  height: 4,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(4),
-                    color: i < nivelSeguridad
-                        ? colorSeguridad
-                        : const Color(0xFFE0E0E0),
-                  ),
-                ),
-              )),
-            ),
+            Row(children: List.generate(4, (i) => Expanded(
+              child: Container(
+                margin: EdgeInsets.only(right: i < 3 ? 4 : 0), height: 4,
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(4),
+                  color: i < nivelSeguridad ? colorSeguridad : const Color(0xFFE0E0E0)),
+              ),
+            ))),
             const SizedBox(height: 6),
-            Text(
-              'Seguridad: $textoSeguridad',
-              style: TextStyle(
-                  fontSize: 12,
-                  color: colorSeguridad,
-                  fontWeight: FontWeight.w600),
-            ),
+            Text('Seguridad: $textoSeguridad',
+              style: TextStyle(fontSize: 12, color: colorSeguridad, fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
-            _Requisito(
-                cumplido: passNueva.length >= 8,
-                texto: 'Mínimo 8 caracteres'),
-            _Requisito(
-                cumplido: passNueva.contains(RegExp(r'[A-Z]')),
-                texto: 'Al menos una mayúscula'),
-            _Requisito(
-                cumplido: passNueva.contains(RegExp(r'[0-9]')),
-                texto: 'Al menos un número'),
-            _Requisito(
-                cumplido: passNueva.contains(
-                    RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-]')),
+            _Requisito(cumplido: passNueva.length >= 8, texto: 'Mínimo 8 caracteres'),
+            _Requisito(cumplido: passNueva.contains(RegExp(r'[A-Z]')), texto: 'Al menos una mayúscula'),
+            _Requisito(cumplido: passNueva.contains(RegExp(r'[0-9]')), texto: 'Al menos un número'),
+            _Requisito(cumplido: passNueva.contains(RegExp(r'[!@#\$%^&*(),.?\":{}|<>_\-]')),
                 texto: 'Al menos un carácter especial'),
           ],
           const SizedBox(height: 12),
-          _CampoPass(
-            controller: passConfirmCtrl,
-            label: 'Confirmar nueva contraseña',
-            hint: 'Repite la nueva contraseña',
-            ver: verConfirm,
-            onToggleVer: onToggleVerConfirm,
-          ),
+          _CampoPass(controller: passConfirmCtrl, label: 'Confirmar nueva contraseña',
+            hint: 'Repite la nueva contraseña', ver: verConfirm, onToggleVer: onToggleVerConfirm),
         ],
       ],
     );
@@ -549,44 +507,23 @@ class _SeccionContrasenaEmpresa extends StatelessWidget {
 
 class _CampoPass extends StatelessWidget {
   final TextEditingController controller;
-  final String label;
-  final String hint;
+  final String label, hint;
   final bool ver;
   final VoidCallback onToggleVer;
   final ValueChanged<String>? onChanged;
-
-  const _CampoPass({
-    required this.controller,
-    required this.label,
-    required this.hint,
-    required this.ver,
-    required this.onToggleVer,
-    this.onChanged,
-  });
+  const _CampoPass({required this.controller, required this.label,
+    required this.hint, required this.ver, required this.onToggleVer, this.onChanged});
 
   @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      obscureText: !ver,
-      onChanged: onChanged,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: const Icon(Icons.lock_outline),
-        suffixIcon: IconButton(
-          icon: Icon(
-            ver
-                ? Icons.visibility_outlined
-                : Icons.visibility_off_outlined,
-            color: AppColors.textSecondary,
-            size: 20,
-          ),
-          onPressed: onToggleVer,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => TextFormField(
+    controller: controller, obscureText: !ver, onChanged: onChanged,
+    decoration: InputDecoration(labelText: label, hintText: hint,
+      prefixIcon: const Icon(Icons.lock_outline),
+      suffixIcon: IconButton(
+        icon: Icon(ver ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+          color: AppColors.textSecondary, size: 20),
+        onPressed: onToggleVer)),
+  );
 }
 
 class _Requisito extends StatelessWidget {
@@ -595,34 +532,16 @@ class _Requisito extends StatelessWidget {
   const _Requisito({required this.cumplido, required this.texto});
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 3),
-      child: Row(
-        children: [
-          Icon(
-            cumplido
-                ? Icons.check_circle_outline
-                : Icons.radio_button_unchecked,
-            size: 14,
-            color: cumplido
-                ? const Color(0xFF2E7D32)
-                : AppColors.textSecondary,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            texto,
-            style: TextStyle(
-              fontSize: 12,
-              color: cumplido
-                  ? const Color(0xFF2E7D32)
-                  : AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 3),
+    child: Row(children: [
+      Icon(cumplido ? Icons.check_circle_outline : Icons.radio_button_unchecked,
+        size: 14, color: cumplido ? const Color(0xFF2E7D32) : AppColors.textSecondary),
+      const SizedBox(width: 6),
+      Text(texto, style: TextStyle(fontSize: 12,
+        color: cumplido ? const Color(0xFF2E7D32) : AppColors.textSecondary)),
+    ]),
+  );
 }
 
 class _Subtitulo extends StatelessWidget {
@@ -630,12 +549,6 @@ class _Subtitulo extends StatelessWidget {
   const _Subtitulo(this.texto);
 
   @override
-  Widget build(BuildContext context) => Text(
-        texto,
-        style: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.bold,
-          color: AppColors.primary,
-        ),
-      );
+  Widget build(BuildContext context) => Text(texto,
+    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.primary));
 }

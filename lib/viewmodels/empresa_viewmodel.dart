@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/services/supabase_service.dart';
@@ -134,9 +135,50 @@ class EmpresaViewModel extends ChangeNotifier {
     return true;
   }
 
-  Future<void> actualizarFoto(String rutaFoto) async {
+  // ── Foto de perfil con Supabase Storage ───────────────────────
+  Future<void> actualizarFoto(String rutaLocal) async {
     if (empresaActual == null) return;
-    final actualizada = empresaActual!.copyWith(fotoPerfil: rutaFoto);
+    final authId = SupabaseService.currentAuthId;
+    if (authId == null) return;
+
+    String? urlFoto;
+
+    if (rutaLocal.isEmpty) {
+      // Eliminar foto
+      try {
+        await SupabaseService.client.storage
+            .from('avatars')
+            .remove(['empresa_$authId.jpg']);
+      } catch (_) {}
+      urlFoto = null;
+    } else {
+      // Subir foto
+      final bytes = await File(rutaLocal).readAsBytes();
+      final path = 'empresa_$authId.jpg';
+
+      try {
+        await SupabaseService.client.storage
+            .from('avatars')
+            .uploadBinary(path, bytes, fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ));
+      } catch (_) {
+        await SupabaseService.client.storage
+            .from('avatars')
+            .updateBinary(path, bytes, fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ));
+      }
+
+      urlFoto = SupabaseService.client.storage
+          .from('avatars')
+          .getPublicUrl(path);
+      urlFoto = '$urlFoto?t=${DateTime.now().millisecondsSinceEpoch}';
+    }
+
+    final actualizada = empresaActual!.copyWith(fotoPerfil: urlFoto);
     await _repo.actualizarEmpresa(actualizada);
     empresaActual = actualizada;
     notifyListeners();
