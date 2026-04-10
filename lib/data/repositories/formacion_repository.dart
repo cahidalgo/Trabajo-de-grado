@@ -14,4 +14,16 @@ class FormacionRepository {
     final data = await query.order('titulo', ascending: true);
     return (data as List).map((e) => Formacion.fromMap(e)).toList();
   }
+
+  /// Obtener solo cursos institucionales (no videos)
+  Future<List<Formacion>> obtenerCursos({String? categoria}) async {
+    var query = _db.from('formacion').select().eq('tipo', 'curso');
+
+    if (categoria != null) {
+      query = query.eq('categoria', categoria);
+    }
+
+    final data = await query.order('entidad', ascending: true);
+    return (data as List).map((e) => Formacion.fromMap(e)).toList();
+  }
 }
