@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/app_ui.dart';
 import '../../data/models/vacante_empresa_model.dart';
+import '../../viewmodels/empresa_viewmodel.dart';
 import '../../viewmodels/vacante_empresa_viewmodel.dart';
 
 class PostulantesScreen extends StatefulWidget {
   final VacanteEmpresaModel vacante;
-  const PostulantesScreen({super.key, required this.vacante});
+
+  const PostulantesScreen({
+    super.key,
+    required this.vacante,
+  });
 
   @override
   State<PostulantesScreen> createState() => _PostulantesScreenState();
@@ -34,11 +40,13 @@ class _PostulantesScreenState extends State<PostulantesScreen>
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<VacanteEmpresaViewModel>();
+    final nombreEmpresa = context.read<EmpresaViewModel>()
+            .empresaActual?.razonSocial ??
+        'nuestra empresa';
 
-    final todos     = vm.postulantes;
-    final enviados  = todos.where((p) => p['estado'] == 'Enviada').toList();
-    final vistos    = todos.where((p) => p['estado'] == 'Vista').toList();
-    final aceptados = todos.where((p) => p['estado'] == 'Aceptada').toList();
+    final todos      = vm.postulantes;
+    final enviados   = todos.where((p) => p['estado'] == 'Enviada').toList();
+    final aceptados  = todos.where((p) => p['estado'] == 'Aceptada').toList();
     final rechazados = todos.where((p) => p['estado'] == 'Rechazada').toList();
 
     return Scaffold(
@@ -99,15 +107,23 @@ class _PostulantesScreenState extends State<PostulantesScreen>
                   controller: _tabCtrl,
                   children: [
                     _ListaPostulantes(
-                        postulantes: todos, vacante: widget.vacante),
+                        postulantes: todos,
+                        vacante: widget.vacante,
+                        nombreEmpresa: nombreEmpresa),
                     _ListaPostulantes(
-                        postulantes: enviados, vacante: widget.vacante,
+                        postulantes: enviados,
+                        vacante: widget.vacante,
+                        nombreEmpresa: nombreEmpresa,
                         emptyMsg: 'No hay postulaciones nuevas sin revisar.'),
                     _ListaPostulantes(
-                        postulantes: aceptados, vacante: widget.vacante,
+                        postulantes: aceptados,
+                        vacante: widget.vacante,
+                        nombreEmpresa: nombreEmpresa,
                         emptyMsg: 'Aún no has aceptado a ningún candidato.'),
                     _ListaPostulantes(
-                        postulantes: rechazados, vacante: widget.vacante,
+                        postulantes: rechazados,
+                        vacante: widget.vacante,
+                        nombreEmpresa: nombreEmpresa,
                         emptyMsg: 'No hay candidatos rechazados.'),
                   ],
                 ),
@@ -119,11 +135,13 @@ class _PostulantesScreenState extends State<PostulantesScreen>
 class _ListaPostulantes extends StatelessWidget {
   final List<Map<String, dynamic>> postulantes;
   final VacanteEmpresaModel vacante;
+  final String nombreEmpresa;
   final String emptyMsg;
 
   const _ListaPostulantes({
     required this.postulantes,
     required this.vacante,
+    required this.nombreEmpresa,
     this.emptyMsg = 'No hay candidatos en esta categoría.',
   });
 
@@ -147,6 +165,7 @@ class _ListaPostulantes extends StatelessWidget {
       itemBuilder: (_, i) => _TarjetaPostulante(
         postulante: postulantes[i],
         vacante: vacante,
+        nombreEmpresa: nombreEmpresa,
       ),
     );
   }
@@ -156,9 +175,13 @@ class _ListaPostulantes extends StatelessWidget {
 class _TarjetaPostulante extends StatelessWidget {
   final Map<String, dynamic> postulante;
   final VacanteEmpresaModel vacante;
+  final String nombreEmpresa;
 
-  const _TarjetaPostulante(
-      {required this.postulante, required this.vacante});
+  const _TarjetaPostulante({
+    required this.postulante,
+    required this.vacante,
+    required this.nombreEmpresa,
+  });
 
   String get _estado => postulante['estado'] as String? ?? 'Enviada';
   int get _postulacionId => postulante['postulacion_id'] as int;
@@ -190,6 +213,40 @@ class _TarjetaPostulante extends StatelessWidget {
     }
   }
 
+  // Normaliza teléfono colombiano para WhatsApp
+  String _normalizarTelefono(String raw) {
+    var tel = raw.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    if (tel.startsWith('+')) tel = tel.substring(1);
+    if (tel.startsWith('57') && tel.length >= 11) return tel;
+    if (tel.startsWith('3') && tel.length == 10) return '57$tel';
+    return tel;
+  }
+
+  bool _esTelefono(String contacto) {
+    final limpio = contacto.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+    return RegExp(r'^[0-9]{7,15}$').hasMatch(limpio);
+  }
+
+  Future<void> _contactarWhatsApp(
+      BuildContext context, String contacto) async {
+    final nombre = postulante['nombre'] as String? ?? 'candidato';
+    final tel = _normalizarTelefono(contacto);
+    final mensaje = Uri.encodeComponent(
+      'Hola $nombre, te contactamos de $nombreEmpresa por tu postulación a "${vacante.titulo}" en Formalia.',
+    );
+    final uri = Uri.parse('https://wa.me/$tel?text=$mensaje');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo abrir WhatsApp. Verifica que esté instalado.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
   Future<void> _cambiarEstado(
       BuildContext context, String nuevoEstado) async {
     final confirmar = await showDialog<bool>(
@@ -205,8 +262,8 @@ class _TarjetaPostulante extends StatelessWidget {
         ),
         content: Text(
           nuevoEstado == 'Aceptada'
-              ? '${postulante['nombre'] ?? 'Este candidato'} será notificado de que su postulación fue aceptada.'
-              : '${postulante['nombre'] ?? 'Este candidato'} será notificado de que su postulación no avanzó.',
+              ? '${postulante['nombre'] ?? 'Este candidato'} verá su postulación como aceptada.'
+              : '${postulante['nombre'] ?? 'Este candidato'} verá su postulación como no avanzada.',
         ),
         actions: [
           TextButton(
@@ -248,17 +305,21 @@ class _TarjetaPostulante extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nombre  = postulante['nombre'] as String? ?? 'Sin nombre';
+    final nombre   = postulante['nombre'] as String? ?? 'Sin nombre';
     final contacto = postulante['correo_o_celular'] as String? ?? '';
-    final nivel   = postulante['nivel_educativo'] as String? ?? '-';
-    final exp     = postulante['experiencia'] as String? ?? '';
-    final habs    = postulante['habilidades'] as String? ?? '';
-    final fecha   = _formatFecha(
+    final nivel    = postulante['nivel_educativo'] as String? ?? '-';
+    final exp      = postulante['experiencia'] as String? ?? '';
+    final habs     = postulante['habilidades'] as String? ?? '';
+    final fecha    = _formatFecha(
         postulante['fecha_postulacion'] as String? ?? '');
-    final inicial = nombre.isNotEmpty ? nombre[0].toUpperCase() : '?';
+    final inicial  = nombre.isNotEmpty ? nombre[0].toUpperCase() : '?';
 
     final bool yaDecidido =
         _estado == 'Aceptada' || _estado == 'Rechazada';
+
+    // Mostrar botón de WhatsApp si el contacto parece un teléfono
+    final bool tieneWhatsApp =
+        contacto.isNotEmpty && _esTelefono(contacto);
 
     return Container(
       decoration: BoxDecoration(
@@ -413,11 +474,41 @@ class _TarjetaPostulante extends StatelessWidget {
             ),
           ),
 
-          // ── Acciones ──────────────────────────────────────
+          // ── Botón WhatsApp (si tiene teléfono y no está rechazado) ──
+          if (tieneWhatsApp && _estado != 'Rechazada')
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _contactarWhatsApp(context, contacto),
+                  icon: const Icon(Icons.chat_rounded, size: 16),
+                  label: Text('Contactar a $nombre por WhatsApp'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF25D366),
+                    side: const BorderSide(
+                        color: Color(0xFF25D366), width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ),
+
+          // ── Acciones (aceptar / rechazar) ─────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
             child: yaDecidido
-                ? _BannerDecision(estado: _estado)
+                ? _BannerDecision(
+                    estado: _estado,
+                    telefono: tieneWhatsApp ? contacto : null,
+                    onWhatsApp: tieneWhatsApp
+                        ? () => _contactarWhatsApp(context, contacto)
+                        : null,
+                  )
                 : Row(
                     children: [
                       Expanded(
@@ -467,42 +558,77 @@ class _TarjetaPostulante extends StatelessWidget {
 // ── Banner cuando ya se tomó decisión ────────────────────────
 class _BannerDecision extends StatelessWidget {
   final String estado;
-  const _BannerDecision({required this.estado});
+  final String? telefono;
+  final VoidCallback? onWhatsApp;
+
+  const _BannerDecision({
+    required this.estado,
+    this.telefono,
+    this.onWhatsApp,
+  });
 
   @override
   Widget build(BuildContext context) {
     final aceptado = estado == 'Aceptada';
     final color = aceptado ? AppColors.success : AppColors.error;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.25)),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            aceptado
-                ? Icons.check_circle_outline
-                : Icons.cancel_outlined,
-            color: color,
-            size: 18,
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withOpacity(0.25)),
           ),
-          const SizedBox(width: 8),
-          Text(
-            aceptado
-                ? 'Candidato aceptado — ya fue notificado'
-                : 'Candidato rechazado — ya fue notificado',
-            style: TextStyle(
-              fontSize: 13,
-              color: color,
-              fontWeight: FontWeight.w600,
+          child: Row(
+            children: [
+              Icon(
+                aceptado
+                    ? Icons.check_circle_outline
+                    : Icons.cancel_outlined,
+                color: color,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  aceptado
+                      ? 'Candidato aceptado — ya puede ver tu contacto'
+                      : 'Candidato rechazado',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Si fue aceptado y hay teléfono, ofrecer WhatsApp también desde aquí
+        if (aceptado && onWhatsApp != null) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onWhatsApp,
+              icon: const Icon(Icons.chat_rounded, size: 16),
+              label: const Text('Escribir por WhatsApp'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF25D366),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+                textStyle: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 }

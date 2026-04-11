@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/app_ui.dart';
@@ -25,7 +26,6 @@ class _HistorialScreenState extends State<HistorialScreen> {
   Widget build(BuildContext context) {
     final vm = context.watch<PostulacionViewModel>();
 
-    // Notificaciones de cambios de estado (aceptados/rechazados sin ver)
     final novedades = vm.historial.where((p) {
       final e = p['estado'] as String? ?? '';
       return e == 'Aceptada' || e == 'Rechazada';
@@ -65,14 +65,12 @@ class _HistorialScreenState extends State<HistorialScreen> {
                     separatorBuilder: (_, __) =>
                         const SizedBox(height: 12),
                     itemBuilder: (_, index) {
-                      // Banner informativo
                       if (index == 0) {
                         return _BannerInfo(
                             conNovedades: novedades.isNotEmpty,
                             totalNovedades: novedades.length);
                       }
 
-                      // Banner de novedades
                       if (novedades.isNotEmpty && index == 1) {
                         return _BannerNovedades(novedades: novedades);
                       }
@@ -291,7 +289,7 @@ class _TarjetaPostulacion extends StatelessWidget {
   String get _mensajeEstado {
     switch (_estado) {
       case 'Aceptada':
-        return '¡Felicitaciones! La empresa aceptó tu postulación. Espera que se contacten contigo.';
+        return '¡Felicitaciones! La empresa aceptó tu postulación. Usa los datos de contacto de abajo para coordinar los siguientes pasos.';
       case 'Rechazada':
         return 'La empresa decidió no avanzar con tu candidatura en este proceso.';
       case 'Vista':
@@ -310,14 +308,50 @@ class _TarjetaPostulacion extends StatelessWidget {
     }
   }
 
+  // Normaliza un número colombiano para WhatsApp (agrega 57 si no lo tiene)
+  String _normalizarTelefono(String raw) {
+    var tel = raw.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    if (tel.startsWith('+')) tel = tel.substring(1);
+    if (tel.startsWith('57') && tel.length >= 11) return tel;
+    if (tel.startsWith('3') && tel.length == 10) return '57$tel';
+    return tel;
+  }
+
+  Future<void> _abrirWhatsApp(String telefono, String nombreEmpresa) async {
+    final tel = _normalizarTelefono(telefono);
+    final titulo = postulacion['titulo'] as String? ?? 'la vacante';
+    final mensaje = Uri.encodeComponent(
+      'Hola, te escribimos de $nombreEmpresa por tu postulación a "$titulo" en Formalia.',
+    );
+    final uri = Uri.parse('https://wa.me/$tel?text=$mensaje');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _abrirCorreo(String correo) async {
+    final titulo = postulacion['titulo'] as String? ?? 'la vacante';
+    final asunto = Uri.encodeComponent('Postulación a "$titulo" en Formalia');
+    final uri = Uri.parse('mailto:$correo?subject=$asunto');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final titulo = postulacion['titulo'] as String? ?? '';
-    final empresa = postulacion['empresa'] as String? ?? '';
-    final categoria = postulacion['categoria'] as String? ?? '';
-    final modalidad = postulacion['modalidad'] as String? ?? '';
-    final fecha = _formatFecha(
+    final titulo     = postulacion['titulo'] as String? ?? '';
+    final empresa    = postulacion['empresa'] as String? ?? '';
+    final categoria  = postulacion['categoria'] as String? ?? '';
+    final modalidad  = postulacion['modalidad'] as String? ?? '';
+    final fecha      = _formatFecha(
         postulacion['fechaPostulacion'] as String? ?? '');
+
+    // Datos de contacto de la empresa (solo presentes si estado == Aceptada)
+    final empresaCorreo    = postulacion['empresa_correo'] as String?;
+    final empresaTelefono  = postulacion['empresa_telefono'] as String?;
+    final tieneContacto    = _estado == 'Aceptada' &&
+        (empresaCorreo != null || empresaTelefono != null);
 
     final bool destacada =
         _estado == 'Aceptada' || _estado == 'Rechazada';
@@ -420,7 +454,7 @@ class _TarjetaPostulacion extends StatelessWidget {
 
           // ── Mensaje de estado ────────────────────────────
           Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+            margin: EdgeInsets.fromLTRB(16, 12, 16, tieneContacto ? 0 : 14),
             padding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
@@ -458,8 +492,161 @@ class _TarjetaPostulacion extends StatelessWidget {
               ],
             ),
           ),
+
+          // ── Contacto de empresa (solo cuando Aceptada) ───
+          if (tieneContacto)
+            _SeccionContactoEmpresa(
+              nombreEmpresa: empresa,
+              correo: empresaCorreo,
+              telefono: empresaTelefono,
+              onWhatsApp: empresaTelefono != null
+                  ? () => _abrirWhatsApp(empresaTelefono, empresa)
+                  : null,
+              onCorreo: empresaCorreo != null
+                  ? () => _abrirCorreo(empresaCorreo)
+                  : null,
+            ),
         ],
       ),
+    );
+  }
+}
+
+// ── Sección de contacto de la empresa ────────────────────────
+class _SeccionContactoEmpresa extends StatelessWidget {
+  final String nombreEmpresa;
+  final String? correo;
+  final String? telefono;
+  final VoidCallback? onWhatsApp;
+  final VoidCallback? onCorreo;
+
+  const _SeccionContactoEmpresa({
+    required this.nombreEmpresa,
+    this.correo,
+    this.telefono,
+    this.onWhatsApp,
+    this.onCorreo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.success.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: AppColors.success.withOpacity(0.25), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Título de sección
+          Row(
+            children: [
+              const Icon(Icons.contact_phone_outlined,
+                  size: 15, color: AppColors.success),
+              const SizedBox(width: 6),
+              Text(
+                'Contacto de $nombreEmpresa',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.success,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Datos de contacto
+          if (telefono != null)
+            _FilaContacto(
+                icono: Icons.phone_outlined,
+                valor: telefono!),
+          if (correo != null) ...[
+            if (telefono != null) const SizedBox(height: 4),
+            _FilaContacto(
+                icono: Icons.email_outlined,
+                valor: correo!),
+          ],
+
+          const SizedBox(height: 12),
+
+          // Botones de acción
+          Row(
+            children: [
+              if (onWhatsApp != null)
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: onWhatsApp,
+                    icon: const Icon(Icons.chat_rounded, size: 16),
+                    label: const Text('WhatsApp'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF25D366),
+                      foregroundColor: Colors.white,
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                      textStyle: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              if (onWhatsApp != null && onCorreo != null)
+                const SizedBox(width: 8),
+              if (onCorreo != null)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onCorreo,
+                    icon: const Icon(Icons.mail_outline, size: 16),
+                    label: const Text('Correo'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(
+                          color: AppColors.primary.withOpacity(0.4)),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      textStyle: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilaContacto extends StatelessWidget {
+  final IconData icono;
+  final String valor;
+  const _FilaContacto({required this.icono, required this.valor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icono, size: 13, color: AppColors.textSecondary),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            valor,
+            style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w500),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }
