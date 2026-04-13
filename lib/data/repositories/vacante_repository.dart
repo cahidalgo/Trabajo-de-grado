@@ -8,14 +8,19 @@ class VacanteRepository {
     List<String>? categorias,
     List<String>? modalidades,
     List<String>? jornadas,
+    String?       busqueda,
   }) async {
     var query = _db
         .from('vacantes')
         .select()
         .eq('activa', true);
 
-    // Supabase no tiene IN con lista dinámica en el builder fluido,
-    // usamos filter con 'in' para listas no vacías.
+    // Filtro de texto: busca en título y nombre de empresa
+    if (busqueda != null && busqueda.trim().isNotEmpty) {
+      final term = busqueda.trim();
+      query = query.or('titulo.ilike.%$term%,empresa.ilike.%$term%');
+    }
+
     if (categorias != null && categorias.isNotEmpty) {
       query = query.inFilter('categoria', categorias);
     }

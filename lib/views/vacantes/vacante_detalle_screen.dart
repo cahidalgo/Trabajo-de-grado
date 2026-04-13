@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/supabase_service.dart';
 import '../../data/models/vacante.dart';
+import '../../data/models/perfil.dart';
 import '../../data/repositories/vacante_repository.dart';
+import '../../data/repositories/perfil_repository.dart';
 import '../../viewmodels/postulacion_viewmodel.dart';
 
 class VacanteDetalleScreen extends StatefulWidget {
@@ -15,11 +18,14 @@ class VacanteDetalleScreen extends StatefulWidget {
 }
 
 class _VacanteDetalleScreenState extends State<VacanteDetalleScreen> {
-  final _repo = VacanteRepository();
+  final _repo       = VacanteRepository();
+  final _perfilRepo = PerfilRepository();
+
   Vacante? _vacante;
-  bool _cargando = true;
-  bool _yaPostulado = false;
-  bool _guardada = false;
+  Perfil?  _perfil;
+  bool _cargando      = true;
+  bool _yaPostulado   = false;
+  bool _guardada      = false;
   bool _togglingGuard = false;
   int? _usuarioId;
 
@@ -40,11 +46,14 @@ class _VacanteDetalleScreenState extends State<VacanteDetalleScreen> {
             .maybeSingle();
         _usuarioId = data?['id'] as int?;
       }
+
       _vacante = await _repo.obtenerPorId(widget.vacanteId);
+
       if (_usuarioId != null && _vacante != null) {
         final vm = context.read<PostulacionViewModel>();
         _yaPostulado = await vm.verificarYaPostulado(widget.vacanteId);
-        _guardada = await _repo.estaGuardada(_usuarioId!, widget.vacanteId);
+        _guardada    = await _repo.estaGuardada(_usuarioId!, widget.vacanteId);
+        _perfil      = await _perfilRepo.obtenerPorUsuario(_usuarioId!);
       }
     } catch (e) {
       debugPrint('Error al cargar detalle: $e');
@@ -92,6 +101,73 @@ class _VacanteDetalleScreenState extends State<VacanteDetalleScreen> {
     } finally {
       if (mounted) setState(() => _togglingGuard = false);
     }
+  }
+
+  /// Punto de entrada del botón "Postularme".
+  /// Verifica perfil completo antes de mostrar el diálogo de confirmación.
+  void _intentarPostular() {
+    final perfilCompleto = _perfil?.perfilCompleto ?? false;
+    if (!perfilCompleto) {
+      _mostrarDialogoPerfilIncompleto();
+      return;
+    }
+    _mostrarDialogoPostulacion();
+  }
+
+  void _mostrarDialogoPerfilIncompleto() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+        icon: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.warning.withOpacity(0.12),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.person_off_outlined,
+              color: AppColors.warning, size: 30),
+        ),
+        title: const Text(
+          'Completa tu perfil primero',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Las empresas necesitan ver tu información para evaluar tu candidatura. '
+          'Añade tu nivel educativo, experiencia y habilidades antes de postularte.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, height: 1.5),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.push('/editar-perfil').then((_) => _cargar());
+                },
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Completar mi perfil'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Después'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   void _mostrarDialogoPostulacion() {
@@ -153,8 +229,9 @@ class _VacanteDetalleScreenState extends State<VacanteDetalleScreen> {
     if (_cargando) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (_vacante == null) return const Scaffold(body: Center(child: Text('Vacante no encontrada.')));
 
-    final vm = context.watch<PostulacionViewModel>();
-    final cargandoPost = vm.state == PostulacionState.loading;
+    final vm            = context.watch<PostulacionViewModel>();
+    final cargandoPost  = vm.state == PostulacionState.loading;
+    final perfilCompleto = _perfil?.perfilCompleto ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -204,7 +281,8 @@ class _VacanteDetalleScreenState extends State<VacanteDetalleScreen> {
                   CircleAvatar(
                     radius: 28,
                     backgroundColor: AppColors.primary.withOpacity(0.12),
-                    child: const Icon(Icons.work_outline, color: AppColors.primary, size: 28),
+                    child: const Icon(Icons.work_outline,
+                        color: AppColors.primary, size: 28),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -233,6 +311,16 @@ class _VacanteDetalleScreenState extends State<VacanteDetalleScreen> {
                 ],
               ),
             ),
+
+            // ── Banner de perfil incompleto ──────────────────────
+            if (!perfilCompleto && !_yaPostulado) ...[
+              const SizedBox(height: 14),
+              _BannerPerfilIncompleto(
+                onCompletar: () =>
+                    context.push('/editar-perfil').then((_) => _cargar()),
+              ),
+            ],
+
             const SizedBox(height: 20),
             _InfoRow(icon: Icons.category_outlined, label: 'Categoría', valor: _vacante!.categoria),
             _InfoRow(icon: Icons.laptop_outlined, label: 'Modalidad', valor: _vacante!.modalidad),
@@ -282,7 +370,8 @@ class _VacanteDetalleScreenState extends State<VacanteDetalleScreen> {
             _yaPostulado
                 ? OutlinedButton.icon(
                     onPressed: null,
-                    icon: const Icon(Icons.check_circle, color: AppColors.success),
+                    icon: const Icon(Icons.check_circle,
+                        color: AppColors.success),
                     label: const Text(
                       'Ya te postulaste',
                       style: TextStyle(color: AppColors.success),
@@ -295,7 +384,7 @@ class _VacanteDetalleScreenState extends State<VacanteDetalleScreen> {
                 : ElevatedButton.icon(
                     onPressed: (!_vacante!.activa || cargandoPost)
                         ? null
-                        : _mostrarDialogoPostulacion,
+                        : _intentarPostular, // ← usa el nuevo método guard
                     icon: cargandoPost
                         ? const SizedBox(
                             height: 18,
@@ -305,14 +394,88 @@ class _VacanteDetalleScreenState extends State<VacanteDetalleScreen> {
                               strokeWidth: 2,
                             ),
                           )
-                        : const Icon(Icons.send_outlined),
-                    label: Text(_vacante!.activa ? 'Postularme' : 'Vacante cerrada'),
+                        : Icon(
+                            perfilCompleto
+                                ? Icons.send_outlined
+                                : Icons.warning_amber_rounded,
+                          ),
+                    label: Text(_vacante!.activa
+                        ? (perfilCompleto
+                            ? 'Postularme'
+                            : 'Postularme (completa tu perfil)')
+                        : 'Vacante cerrada'),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
+                      backgroundColor: perfilCompleto || !_vacante!.activa
+                          ? null
+                          : AppColors.warning,
                     ),
                   ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Banner de aviso de perfil incompleto ──────────────────────
+class _BannerPerfilIncompleto extends StatelessWidget {
+  final VoidCallback onCompletar;
+  const _BannerPerfilIncompleto({required this.onCompletar});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: AppColors.warning.withOpacity(0.35), width: 1.5),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline,
+              color: AppColors.warning, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Tu perfil está incompleto',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.warning,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                const Text(
+                  'Las empresas evaluarán tu candidatura con la información de tu perfil. Complétalo para tener más chances.',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.warning,
+                      height: 1.4),
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: onCompletar,
+                  child: const Text(
+                    'Completar perfil →',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.warning,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -333,7 +496,8 @@ class _InfoRow extends StatelessWidget {
         children: [
           Icon(icon, size: 20, color: AppColors.primary),
           const SizedBox(width: 8),
-          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text('$label: ',
+              style: const TextStyle(fontWeight: FontWeight.w600)),
           Expanded(child: Text(valor!)),
         ],
       ),

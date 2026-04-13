@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/session_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -25,13 +26,14 @@ class _SplashScreenState extends State<SplashScreen> {
     final user = SupabaseService.currentUser;
 
     if (user == null) {
+      SessionService.limpiar();
       context.go('/login');
       return;
     }
 
     final db = SupabaseService.client;
 
-    // ¿Es admin? (consulta tabla admins)
+    // ¿Es admin?
     final adminData = await db
         .from('admins')
         .select('id')
@@ -39,6 +41,7 @@ class _SplashScreenState extends State<SplashScreen> {
         .maybeSingle();
 
     if (adminData != null) {
+      SessionService.setRol('admin');
       if (!mounted) return;
       context.go('/admin');
       return;
@@ -52,6 +55,7 @@ class _SplashScreenState extends State<SplashScreen> {
         .maybeSingle();
 
     if (usuarioData != null) {
+      SessionService.setRol('vendedor');
       if (!mounted) return;
       context.go('/home');
       return;
@@ -66,8 +70,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!mounted) return;
     if (empresaData != null) {
+      SessionService.setRol('empresa');
       context.go('/empresa/dashboard');
     } else {
+      SessionService.limpiar();
       await SupabaseService.client.auth.signOut();
       if (mounted) context.go('/login');
     }

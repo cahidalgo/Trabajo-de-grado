@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/services/supabase_service.dart';
+import '../core/services/session_service.dart';
 import '../data/models/empresa_model.dart';
 import '../data/repositories/empresa_repository.dart';
 
@@ -191,6 +192,7 @@ class EmpresaViewModel extends ChangeNotifier {
   // ── Cerrar sesión ─────────────────────────────────────────────
   Future<void> cerrarSesion() async {
     await SupabaseService.client.auth.signOut();
+    SessionService.limpiar();
     empresaActual = null;
     notifyListeners();
   }

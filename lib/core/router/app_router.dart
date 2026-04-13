@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/session_service.dart';
 import '../../views/auth/login_screen.dart';
 import '../../views/auth/registro_screen.dart';
 import '../../views/onboarding/onboarding_screen.dart';
@@ -27,25 +28,80 @@ const _rutasPublicas = {
   '/politica-privacidad',
 };
 
+// ── Prefijos / rutas exclusivas por rol ──────────────────────
+const _prefijoEmpresa = '/empresa/';
+const _rutasEmpresaExactas = {
+  '/empresa/dashboard',
+  '/empresa/editar',
+  '/empresa/publicar',
+  '/empresa/publicar-confirmacion',
+  '/empresa/editar-vacante',
+  '/empresa/postulantes',
+};
+
+const _rutasAdmin = {'/admin'};
+
+// Rutas que solo puede ver un vendedor (no empresa ni admin)
+const _rutasVendedor = {
+  '/home',
+  '/editar-perfil',
+  '/completar-perfil',
+  '/onboarding',
+};
+
+String? _guardRol(String ruta, String? rol) {
+  final esEmpresaRuta = ruta.startsWith(_prefijoEmpresa) ||
+      _rutasEmpresaExactas.contains(ruta);
+  final esAdminRuta   = _rutasAdmin.any((r) => ruta.startsWith(r));
+  final esVendedorRuta = _rutasVendedor.contains(ruta);
+
+  // Empresa intentando ir a rutas de vendedor o admin
+  if (rol == 'empresa' && (esVendedorRuta || esAdminRuta)) {
+    return '/empresa/dashboard';
+  }
+
+  // Admin intentando ir a rutas de vendedor o empresa
+  if (rol == 'admin' && (esVendedorRuta || esEmpresaRuta)) {
+    return '/admin';
+  }
+
+  // Vendedor intentando ir a rutas de empresa o admin
+  if (rol == 'vendedor' && (esEmpresaRuta || esAdminRuta)) {
+    return '/home';
+  }
+
+  // Usuario logueado intentando acceder a ruta protegida sin rol cargado
+  // (raro, pero posible en race conditions — dejamos pasar; splash resuelve)
+
+  return null; // sin redirección
+}
+
 final appRouter = GoRouter(
   initialLocation: '/',
 
   // ── Route guard global ──────────────────────────────────────
   redirect: (context, state) {
     final loggedIn = SupabaseService.currentUser != null;
-    final ruta = state.matchedLocation;
+    final ruta     = state.matchedLocation;
+    final rol      = SessionService.rolActual;
 
-    // Si no hay sesión y la ruta es protegida → login
+    // 1. Sin sesión → solo rutas públicas
     if (!loggedIn && !_rutasPublicas.contains(ruta)) {
       return '/login';
     }
 
-    // Si hay sesión y está en login/registro → no dejar volver
+    // 2. Con sesión → no dejar volver a login/registro
     if (loggedIn && (ruta == '/login' || ruta == '/registro')) {
-      return '/';
+      return SessionService.homeParaRol();
     }
 
-    return null; // sin redirección
+    // 3. Con sesión + rol conocido → protección por rol
+    if (loggedIn && rol != null) {
+      final redireccion = _guardRol(ruta, rol);
+      if (redireccion != null) return redireccion;
+    }
+
+    return null;
   },
 
   routes: [

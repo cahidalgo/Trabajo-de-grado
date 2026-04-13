@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/vacante.dart';
@@ -12,9 +13,14 @@ class VacantesListScreen extends StatefulWidget {
 }
 
 class _VacantesListScreenState extends State<VacantesListScreen> {
-  final _repo = VacanteRepository();
+  final _repo           = VacanteRepository();
+  final _searchCtrl     = TextEditingController();
+  final _searchFocus    = FocusNode();
+  Timer? _debounce;
+
   List<Vacante> _vacantes = [];
-  bool _cargando = true;
+  bool _cargando          = true;
+  String _busqueda        = '';
 
   final List<String> _filtrosCategorias = [];
   final List<String> _filtrosModalidades = [];
@@ -30,13 +36,36 @@ class _VacantesListScreenState extends State<VacantesListScreen> {
     _cargar();
   }
 
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchCtrl.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     _vacantes = await _repo.obtenerTodas(
+      busqueda:   _busqueda.isEmpty ? null : _busqueda,
       categorias: _filtrosCategorias.isEmpty ? null : _filtrosCategorias,
       modalidades: _filtrosModalidades.isEmpty ? null : _filtrosModalidades,
     );
     setState(() => _cargando = false);
+  }
+
+  void _onBusquedaChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      setState(() => _busqueda = value.trim());
+      _cargar();
+    });
+  }
+
+  void _limpiarBusqueda() {
+    _searchCtrl.clear();
+    setState(() => _busqueda = '');
+    _cargar();
   }
 
   bool get _hayFiltros =>
@@ -45,7 +74,7 @@ class _VacantesListScreenState extends State<VacantesListScreen> {
   int get _totalFiltrosActivos =>
       _filtrosCategorias.length + _filtrosModalidades.length;
 
-  void _limpiarFiltros() {
+  void _limpiarTodo() {
     setState(() {
       _filtrosCategorias.clear();
       _filtrosModalidades.clear();
@@ -84,6 +113,9 @@ class _VacantesListScreenState extends State<VacantesListScreen> {
       ),
     );
   }
+
+  bool get _hayAlgunFiltroActivo =>
+      _hayFiltros || _busqueda.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -127,6 +159,50 @@ class _VacantesListScreenState extends State<VacantesListScreen> {
       ),
       body: Column(
         children: [
+          // ── Barra de búsqueda ────────────────────────────────────
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+            child: TextField(
+              controller: _searchCtrl,
+              focusNode: _searchFocus,
+              onChanged: _onBusquedaChanged,
+              textInputAction: TextInputAction.search,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Buscar por cargo o empresa...',
+                hintStyle: const TextStyle(
+                    color: AppColors.textSecondary, fontSize: 14),
+                prefixIcon: const Icon(Icons.search_rounded,
+                    color: AppColors.textSecondary, size: 20),
+                suffixIcon: _busqueda.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close_rounded,
+                            size: 18, color: AppColors.textSecondary),
+                        onPressed: _limpiarBusqueda,
+                      )
+                    : null,
+                filled: true,
+                fillColor: AppColors.background,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                      color: AppColors.primary, width: 1.5),
+                ),
+              ),
+            ),
+          ),
+
           // ── Barra de filtros activos ─────────────────────────────
           if (_hayFiltros)
             Container(
@@ -148,7 +224,7 @@ class _VacantesListScreenState extends State<VacantesListScreen> {
                       ),
                       const Spacer(),
                       GestureDetector(
-                        onTap: _limpiarFiltros,
+                        onTap: _limpiarTodo,
                         child: const Text(
                           'Limpiar todo',
                           style: TextStyle(
@@ -196,35 +272,14 @@ class _VacantesListScreenState extends State<VacantesListScreen> {
             child: _cargando
                 ? const Center(child: CircularProgressIndicator())
                 : _vacantes.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.search_off,
-                                size: 64,
-                                color: AppColors.textSecondary),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'No hay vacantes con esos filtros',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Intenta con otras combinaciones',
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            TextButton.icon(
-                              onPressed: _limpiarFiltros,
-                              icon: const Icon(
-                                  Icons.filter_alt_off_outlined),
-                              label: const Text('Limpiar filtros'),
-                            ),
-                          ],
-                        ),
+                    ? _EmptyState(
+                        conFiltros: _hayAlgunFiltroActivo,
+                        onLimpiar: _hayAlgunFiltroActivo
+                            ? () {
+                                _limpiarBusqueda();
+                                _limpiarTodo();
+                              }
+                            : null,
                       )
                     : RefreshIndicator(
                         onRefresh: _cargar,
@@ -232,10 +287,11 @@ class _VacantesListScreenState extends State<VacantesListScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 20),
                           itemCount: _vacantes.length,
-                          separatorBuilder: (_, _) =>
+                          separatorBuilder: (_, __) =>
                               const SizedBox(height: 14),
                           itemBuilder: (_, i) => _TarjetaVacante(
                             vacante: _vacantes[i],
+                            terminoBusqueda: _busqueda,
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -254,7 +310,55 @@ class _VacantesListScreenState extends State<VacantesListScreen> {
   }
 }
 
-// ── Modal de filtros ──────────────────────────────────────────────────────────
+// ── Empty state contextual ────────────────────────────────────
+class _EmptyState extends StatelessWidget {
+  final bool conFiltros;
+  final VoidCallback? onLimpiar;
+  const _EmptyState({required this.conFiltros, this.onLimpiar});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            conFiltros ? Icons.search_off : Icons.work_off_outlined,
+            size: 64,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            conFiltros
+                ? 'No hay vacantes con esa búsqueda'
+                : 'No hay vacantes disponibles',
+            style: const TextStyle(
+                fontSize: 16, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            conFiltros
+                ? 'Prueba con otras palabras o quita los filtros'
+                : 'Vuelve pronto, se publican nuevas vacantes cada día',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                color: AppColors.textSecondary, fontSize: 13),
+          ),
+          if (onLimpiar != null) ...[
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: onLimpiar,
+              icon: const Icon(Icons.filter_alt_off_outlined),
+              label: const Text('Limpiar búsqueda y filtros'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Modal de filtros ──────────────────────────────────────────
 class _FiltroModal extends StatefulWidget {
   final List<String> tempCategorias;
   final List<String> tempModalidades;
@@ -360,7 +464,6 @@ class _FiltroModalState extends State<_FiltroModal> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Título + limpiar ───────────────────────────────────
           Row(
             children: [
               const Text(
@@ -382,7 +485,6 @@ class _FiltroModalState extends State<_FiltroModal> {
                 ),
             ],
           ),
-
           if (_total > 0)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -395,10 +497,7 @@ class _FiltroModalState extends State<_FiltroModal> {
                 ),
               ),
             ),
-
           const SizedBox(height: 8),
-
-          // ── Categorías ─────────────────────────────────────────
           Row(
             children: [
               const Icon(Icons.category_outlined,
@@ -430,10 +529,7 @@ class _FiltroModalState extends State<_FiltroModal> {
               );
             }).toList(),
           ),
-
           const SizedBox(height: 20),
-
-          // ── Modalidades ────────────────────────────────────────
           Row(
             children: [
               const Icon(Icons.laptop_outlined,
@@ -465,10 +561,7 @@ class _FiltroModalState extends State<_FiltroModal> {
               );
             }).toList(),
           ),
-
           const SizedBox(height: 24),
-
-          // ── Botones ────────────────────────────────────────────
           Row(
             children: [
               Expanded(
@@ -495,7 +588,7 @@ class _FiltroModalState extends State<_FiltroModal> {
   }
 }
 
-// ── Chip de filtro activo con X ───────────────────────────────────────────────
+// ── Chip de filtro activo ─────────────────────────────────────
 class _FiltroActivo extends StatelessWidget {
   final String label;
   final VoidCallback onQuitar;
@@ -537,11 +630,16 @@ class _FiltroActivo extends StatelessWidget {
   }
 }
 
-// ── Tarjeta de vacante ────────────────────────────────────────────────────────
+// ── Tarjeta de vacante ────────────────────────────────────────
 class _TarjetaVacante extends StatelessWidget {
   final Vacante vacante;
+  final String terminoBusqueda;
   final VoidCallback onTap;
-  const _TarjetaVacante({required this.vacante, required this.onTap});
+  const _TarjetaVacante({
+    required this.vacante,
+    required this.terminoBusqueda,
+    required this.onTap,
+  });
 
   static const _coloresCat = {
     'ventas':       [Color(0xFFE3F2FD), Color(0xFF1565C0)],
@@ -559,14 +657,39 @@ class _TarjetaVacante extends StatelessWidget {
     'construcción': Icons.construction_outlined,
   };
 
+  /// Resalta el término de búsqueda dentro del texto.
+  Widget _textoResaltado(String texto, String termino, TextStyle base) {
+    if (termino.isEmpty) return Text(texto, style: base, maxLines: 2, overflow: TextOverflow.ellipsis);
+    final lower   = texto.toLowerCase();
+    final lTerm   = termino.toLowerCase();
+    final idx     = lower.indexOf(lTerm);
+    if (idx == -1) return Text(texto, style: base, maxLines: 2, overflow: TextOverflow.ellipsis);
+
+    return RichText(
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(style: base, children: [
+        TextSpan(text: texto.substring(0, idx)),
+        TextSpan(
+          text: texto.substring(idx, idx + termino.length),
+          style: base.copyWith(
+            backgroundColor: Colors.yellow.withOpacity(0.5),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        TextSpan(text: texto.substring(idx + termino.length)),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cat = vacante.categoria?.toLowerCase() ?? '';
     final colores =
         _coloresCat[cat] ?? [const Color(0xFFF5F5F5), AppColors.primary];
     final icono = _iconosCat[cat] ?? Icons.work_outline;
-    final bgColor = colores[0];
-    final acColor = colores[1];
+    final bgColor = colores[0] as Color;
+    final acColor = colores[1] as Color;
 
     return Material(
       borderRadius: BorderRadius.circular(16),
@@ -603,20 +726,20 @@ class _TarjetaVacante extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          _textoResaltado(
                             vacante.titulo,
-                            style: TextStyle(
+                            terminoBusqueda,
+                            TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
                               color: acColor,
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
-                          Text(
+                          _textoResaltado(
                             vacante.empresa ?? '',
-                            style: const TextStyle(
+                            terminoBusqueda,
+                            const TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
                             ),
@@ -684,7 +807,7 @@ class _TarjetaVacante extends StatelessWidget {
   }
 }
 
-// ── Pill chip ─────────────────────────────────────────────────────────────────
+// ── Pill chip ─────────────────────────────────────────────────
 class _PillChip extends StatelessWidget {
   final String label;
   final Color color;

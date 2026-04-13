@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/services/supabase_service.dart';
+import '../core/services/session_service.dart';
 import '../data/repositories/usuario_repository.dart';
 import '../data/repositories/empresa_repository.dart';
 
@@ -15,10 +16,10 @@ enum AuthState {
 }
 
 class AuthViewModel extends ChangeNotifier {
-  final _repo       = UsuarioRepository();
+  final _repo        = UsuarioRepository();
   final _empresaRepo = EmpresaRepository();
 
-  AuthState _state   = AuthState.idle;
+  AuthState _state  = AuthState.idle;
   String?   _errorMsg;
   int?      _usuarioIdActual;
 
@@ -63,6 +64,7 @@ class AuthViewModel extends ChangeNotifier {
       );
 
       _usuarioIdActual = usuario.id;
+      SessionService.setRol('vendedor');
       _state = AuthState.registroExitoso;
     } on AuthException catch (e) {
       _errorMsg = e.message;
@@ -83,7 +85,7 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     final input = correoOTelefono.trim();
-    final db = SupabaseService.client;
+    final db    = SupabaseService.client;
 
     try {
       // ── 1. Construir el email para Supabase Auth ───────────────
@@ -96,7 +98,7 @@ class AuthViewModel extends ChangeNotifier {
       final AuthResponse res;
       try {
         res = await db.auth.signInWithPassword(
-          email: authEmail,
+          email:    authEmail,
           password: contrasena,
         );
       } on AuthException {
@@ -116,14 +118,13 @@ class AuthViewModel extends ChangeNotifier {
       final authId = res.user!.id;
 
       // ── 3. Determinar el rol consultando las tablas ────────────
-      // ¿Es admin? (consulta tabla admins)
       if (await _esAdmin(authId)) {
+        SessionService.setRol('admin');
         _state = AuthState.loginAdmin;
         notifyListeners();
         return;
       }
 
-      // ¿Es vendedor?
       final usuarioData = await db
           .from('usuarios')
           .select('id')
@@ -132,12 +133,12 @@ class AuthViewModel extends ChangeNotifier {
 
       if (usuarioData != null) {
         _usuarioIdActual = usuarioData['id'] as int;
+        SessionService.setRol('vendedor');
         _state = AuthState.loginExitoso;
         notifyListeners();
         return;
       }
 
-      // ¿Es empresa?
       final empresaData = await db
           .from('empresas')
           .select('id')
@@ -145,13 +146,15 @@ class AuthViewModel extends ChangeNotifier {
           .maybeSingle();
 
       if (empresaData != null) {
+        SessionService.setRol('empresa');
         _state = AuthState.loginEmpresa;
         notifyListeners();
         return;
       }
 
-      // Auth exitoso pero no está en ninguna tabla → limpiar sesión
+      // Auth exitoso pero no está en ninguna tabla
       await db.auth.signOut();
+      SessionService.limpiar();
       _errorMsg = 'Cuenta no encontrada. Contacta soporte.';
       _state    = AuthState.error;
     } on AuthException catch (e) {
@@ -169,10 +172,11 @@ class AuthViewModel extends ChangeNotifier {
     final user = SupabaseService.currentUser;
     if (user == null) return null;
 
-    // ¿Es admin?
-    if (await _esAdmin(user.id)) return 'admin';
+    if (await _esAdmin(user.id)) {
+      SessionService.setRol('admin');
+      return 'admin';
+    }
 
-    // ¿Es vendedor?
     final usuarioData = await SupabaseService.client
         .from('usuarios')
         .select('id')
@@ -180,16 +184,19 @@ class AuthViewModel extends ChangeNotifier {
         .maybeSingle();
     if (usuarioData != null) {
       _usuarioIdActual = usuarioData['id'] as int;
+      SessionService.setRol('vendedor');
       return 'vendedor';
     }
 
-    // ¿Es empresa?
     final empresaData = await SupabaseService.client
         .from('empresas')
         .select('id')
         .eq('auth_id', user.id)
         .maybeSingle();
-    if (empresaData != null) return 'empresa';
+    if (empresaData != null) {
+      SessionService.setRol('empresa');
+      return 'empresa';
+    }
 
     return null;
   }
@@ -197,6 +204,7 @@ class AuthViewModel extends ChangeNotifier {
   // ── Cerrar sesión ─────────────────────────────────────────────
   Future<void> cerrarSesion() async {
     await SupabaseService.client.auth.signOut();
+    SessionService.limpiar();
     _usuarioIdActual = null;
     _state = AuthState.idle;
     notifyListeners();
