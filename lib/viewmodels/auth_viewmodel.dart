@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/services/supabase_service.dart';
 import '../core/services/session_service.dart';
 import '../data/repositories/usuario_repository.dart';
-import '../data/repositories/empresa_repository.dart';
 
 enum AuthState {
   idle,
@@ -17,7 +16,6 @@ enum AuthState {
 
 class AuthViewModel extends ChangeNotifier {
   final _repo        = UsuarioRepository();
-  final _empresaRepo = EmpresaRepository();
 
   AuthState _state  = AuthState.idle;
   String?   _errorMsg;

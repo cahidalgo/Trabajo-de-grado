@@ -16,9 +16,7 @@ class CompletarPerfilScreen extends StatefulWidget {
 }
 
 class _CompletarPerfilScreenState extends State<CompletarPerfilScreen> {
-  final _formKey1 = GlobalKey<FormState>();
   final _formKey2 = GlobalKey<FormState>();
-  final _formKey3 = GlobalKey<FormState>();
 
   final _experienciaCtrl = TextEditingController();
   final _habilidadesCtrl = TextEditingController();
