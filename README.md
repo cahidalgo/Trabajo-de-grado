@@ -324,25 +324,3 @@ El guard de rutas de `go_router` es síncrono — no puede hacer llamadas async 
 Supabase Auth no soporta autenticación por SMS en el tier gratuito. Convertir `3001234567` en `3001234567@formalia.co` permite usar el flujo de email/password estándar sin costo adicional.
 
 ---
-
-## Pendientes y roadmap
-
-### Crítico (próxima iteración)
-- [ ] Recuperación de contraseña (flujo de reset por email)
-- [ ] Botón "Vista" en panel de postulantes (marcar que la empresa revisó)
-- [ ] Manejo de sesión expirada (listener de auth state)
-
-### Importante
-- [ ] Zona / ubicación en las vacantes del vendedor
-- [ ] Foto de perfil para vendedores
-- [ ] Feedback claro cuando la empresa no está validada por el admin
-- [ ] Paginación en lista de vacantes (`.limit()` + scroll infinito)
-- [ ] Métricas por vacante en el dashboard de empresa
-
-### Producción
-- [ ] Mover API keys a Supabase Edge Functions
-- [ ] Configurar ProGuard con reglas específicas para Supabase/Ktor (actualmente R8 desactivado)
-- [ ] Firma del APK con keystore propio (actualmente usa debug keystore)
-- [ ] Publicación en Google Play Store (applicationId único, no `com.example.mvp`)
-- [ ] Push notifications cuando cambia el estado de una postulación
-- [ ] Términos y condiciones separados de la política de privacidad
